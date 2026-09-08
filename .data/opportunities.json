@@ -1,1 +1,368 @@
-[]
+[
+  {
+    "id": "opp-1",
+    "title": "NeurIPS 2026: Conference on Neural Information Processing Systems",
+    "type": "conference",
+    "conference_tier": "Core A*",
+    "organizer": "NeurIPS Foundation",
+    "start_date": "2026-12-06",
+    "end_date": "2026-12-12",
+    "format": "hybrid",
+    "location": "Vancouver Convention Centre, Canada",
+    "source_url": "https://neurips.cc/Conferences/2026",
+    "description": "The premier annual conference fostering research in machine learning and computational neuroscience. Features oral presentations, poster sessions, workshops, and tutorials.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Verified Core A* conference",
+      "Official website URL",
+      "Explicit conference dates confirmed"
+    ],
+    "status": "published",
+    "created_at": "2026-09-01T10:00:00Z",
+    "updated_at": "2026-09-01T10:00:00Z"
+  },
+  {
+    "id": "opp-2",
+    "title": "HackMIT 2026",
+    "type": "hackathon",
+    "organizer": "MIT TechX",
+    "start_date": "2026-09-19",
+    "end_date": "2026-09-20",
+    "format": "hybrid",
+    "location": "Cambridge, MA, USA & Online",
+    "source_url": "https://hackmit.org",
+    "description": "MIT's flagship undergraduate hackathon welcoming over 1,000 students worldwide to build innovative hardware and software projects with mentorship from top technology firms.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Major student hackathon portal",
+      "Official domain verified"
+    ],
+    "status": "published",
+    "created_at": "2026-09-02T11:30:00Z",
+    "updated_at": "2026-09-02T11:30:00Z"
+  },
+  {
+    "id": "opp-3",
+    "title": "Google DeepMind Research Scientist & Engineering Internships 2027",
+    "type": "internship",
+    "organizer": "Google DeepMind",
+    "start_date": "2026-09-01",
+    "end_date": "2026-11-15",
+    "format": "hybrid",
+    "location": "London, UK / Mountain View, CA",
+    "source_url": "https://www.google.com/about/careers/applications/jobs/results/?q=deepmind%20intern",
+    "description": "Applications open for PhD and Masters students passionate about AI, reinforcement learning, and LLM reasoning. Hands-on research projects alongside world-leading scientists.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Official company career board",
+      "Application deadline specified"
+    ],
+    "status": "published",
+    "created_at": "2026-09-03T09:15:00Z",
+    "updated_at": "2026-09-03T09:15:00Z"
+  },
+  {
+    "id": "opp-4",
+    "title": "ICSE 2027: International Conference on Software Engineering",
+    "type": "conference",
+    "conference_tier": "Core A*",
+    "organizer": "IEEE Computer Society / ACM SIGSOFT",
+    "start_date": "2027-04-24",
+    "end_date": "2027-05-02",
+    "format": "in-person",
+    "location": "Melbourne, Australia",
+    "source_url": "https://conf.researchr.org/home/icse-2027",
+    "description": "The premier software engineering conference, providing a forum for researchers, practitioners and educators to present and discuss the most recent innovations and trends.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Verified Core A* ranking via CORE 2023/2026 portal",
+      "Official ACM/IEEE researchr portal"
+    ],
+    "status": "published",
+    "created_at": "2026-09-04T14:00:00Z",
+    "updated_at": "2026-09-04T14:00:00Z"
+  },
+  {
+    "id": "opp-5",
+    "title": "ETHGlobal San Francisco 2026",
+    "type": "hackathon",
+    "organizer": "ETHGlobal",
+    "start_date": "2026-10-16",
+    "end_date": "2026-10-18",
+    "format": "in-person",
+    "location": "San Francisco, CA, USA",
+    "source_url": "https://ethglobal.com/events/sanfrancisco2026",
+    "description": "One of the largest decentralized web and smart contract hackathons of the season, bringing together developers, founders, and protocols with $500k+ in bounties.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Verified organizer domain",
+      "Specific date range and venue confirmed"
+    ],
+    "status": "published",
+    "created_at": "2026-09-05T08:20:00Z",
+    "updated_at": "2026-09-05T08:20:00Z"
+  },
+  {
+    "id": "opp-6",
+    "title": "Advanced LLM Fine-Tuning & Agentic Workflows Workshop",
+    "type": "workshop",
+    "organizer": "Hugging Face & Weights & Biases",
+    "start_date": "2026-09-28",
+    "end_date": "2026-09-29",
+    "format": "online",
+    "source_url": "https://wandb.ai/events/llm-agentic-systems-workshop",
+    "description": "Two-day hands-on technical workshop covering modern parameter-efficient fine-tuning (LoRA/QLoRA), alignment with DPO, and building tool-calling agent systems.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Established developer platform",
+      "Complete itinerary and instructor credentials"
+    ],
+    "status": "published",
+    "created_at": "2026-09-06T13:45:00Z",
+    "updated_at": "2026-09-06T13:45:00Z"
+  },
+  {
+    "id": "opp-7",
+    "title": "EMNLP 2026: Empirical Methods in Natural Language Processing",
+    "type": "conference",
+    "conference_tier": "Core A",
+    "organizer": "SIGDAT / Association for Computational Linguistics",
+    "start_date": "2026-11-12",
+    "end_date": "2026-11-16",
+    "format": "hybrid",
+    "location": "Abu Dhabi, UAE",
+    "source_url": "https://2026.emnlp.org",
+    "description": "Leading conference on empirical methods and statistical modeling in computational linguistics and NLP, featuring findings in multilingual LLMs and evaluation.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Verified Core A ranking",
+      "Official ACL portal"
+    ],
+    "status": "published",
+    "created_at": "2026-09-06T15:10:00Z",
+    "updated_at": "2026-09-06T15:10:00Z"
+  },
+  {
+    "id": "opp-8",
+    "title": "CalHacks 13.0",
+    "type": "hackathon",
+    "organizer": "UC Berkeley Cal Hacks",
+    "start_date": "2026-10-23",
+    "end_date": "2026-10-25",
+    "format": "in-person",
+    "location": "San Francisco & UC Berkeley, CA",
+    "source_url": "https://calhacks.io",
+    "description": "The world's largest collegiate hackathon, drawing over 2,000 hackers for 36 hours of high-intensity hardware, AI, and software prototyping.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Major collegiate event confirmed",
+      "Official site active"
+    ],
+    "status": "published",
+    "created_at": "2026-09-07T09:00:00Z",
+    "updated_at": "2026-09-07T09:00:00Z"
+  },
+  {
+    "id": "opp-9",
+    "title": "Meta Software Engineer Intern - Summer 2027",
+    "type": "internship",
+    "organizer": "Meta",
+    "start_date": "2026-08-15",
+    "end_date": "2026-10-31",
+    "format": "in-person",
+    "location": "Menlo Park, CA / New York, NY / Seattle, WA",
+    "source_url": "https://www.metacareers.com/jobs/software-engineer-intern-summer-2027",
+    "description": "12-week intensive summer internship working on core infrastructure, mobile apps, or recommendation systems. Open to undergraduate and master's students graduating in late 2027 or 2028.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Meta Careers direct portal verified"
+    ],
+    "status": "published",
+    "created_at": "2026-09-07T12:00:00Z",
+    "updated_at": "2026-09-07T12:00:00Z"
+  },
+  {
+    "id": "opp-10",
+    "title": "International Web & Intelligent Computing Summit (IWICS 2026)",
+    "type": "conference",
+    "conference_tier": "Core B",
+    "organizer": "Computing & Informatics Society (Unverified regional chapter)",
+    "start_date": "2026-11-20",
+    "end_date": "2026-11-22",
+    "format": "online",
+    "source_url": "https://archive.is/iwics2026-cfp",
+    "description": "Call for papers discovered on community forum. Focuses on web architectures and intelligent reasoning systems, but exact submission portal redirect has intermittent HTTP 500.",
+    "discovery_confidence": "low",
+    "confidence_reasons": [
+      "Source URL points to forum archive mirror rather than top-level organizational domain",
+      "Conference tiering Core B inferred from previous edition proceedings, awaiting manual confirmation"
+    ],
+    "status": "published",
+    "created_at": "2026-09-07T18:00:00Z",
+    "updated_at": "2026-09-07T18:00:00Z"
+  },
+  {
+    "id": "opp-11",
+    "title": "Autonomous Systems & Edge AI Hackathon",
+    "type": "hackathon",
+    "organizer": "RoboDev Community",
+    "start_date": "2026-10-10",
+    "end_date": "2026-10-12",
+    "format": "online",
+    "source_url": "https://devpost.com/software/edge-ai-hack-provisional",
+    "description": "Community virtual hackathon on edge computer vision models. Start date tentative based on Discord announcement screenshot.",
+    "discovery_confidence": "low",
+    "confidence_reasons": [
+      "Tentative dates detected from community Discord mention",
+      "No standalone registration landing page detected yet"
+    ],
+    "status": "published",
+    "created_at": "2026-09-08T02:30:00Z",
+    "updated_at": "2026-09-08T02:30:00Z"
+  },
+  {
+    "id": "opp-12",
+    "title": "Generative Audio & DSP Masterclass",
+    "type": "workshop",
+    "organizer": "AudioLab Meetup Group",
+    "start_date": "2026-10-05",
+    "end_date": "2026-10-05",
+    "format": "online",
+    "source_url": "https://meetup.com/audiolab-tech/events/294821",
+    "description": "An evening workshop exploring diffusion models for digital signal processing and sound synthesis. Organizer details are minimal.",
+    "discovery_confidence": "low",
+    "confidence_reasons": [
+      "Short duration single-evening meetup with incomplete curriculum outline",
+      "Organizer has fewer than 2 verified previous events"
+    ],
+    "status": "published",
+    "created_at": "2026-09-08T04:10:00Z",
+    "updated_at": "2026-09-08T04:10:00Z"
+  },
+  {
+    "id": "opp-1788855628865-ja2r2",
+    "title": "KubeHacks 2026: Cloud Native Systems Hackathon",
+    "type": "hackathon",
+    "conference_tier": null,
+    "organizer": "Cloud Native Computing Foundation (CNCF)",
+    "start_date": "2026-11-07",
+    "end_date": "2026-11-09",
+    "format": "online",
+    "location": null,
+    "source_url": "https://devpost.com/hackathons?search=kubehacks",
+    "description": "Build enterprise-grade distributed microservices, Kubernetes operators, and observability tools. Sponsored by CNCF member companies with $75,000 in prizes.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Discovered via CNCF community event portal",
+      "Official Devpost registry URL verified"
+    ],
+    "status": "published",
+    "created_at": "2026-09-08T08:20:28.863Z",
+    "updated_at": "2026-09-08T08:20:28.863Z"
+  },
+  {
+    "id": "opp-1788855628865-zgabm",
+    "title": "ACM SIGCOMM 2027: Annual Conference on Data Communication",
+    "type": "conference",
+    "conference_tier": "Core A*",
+    "organizer": "ACM SIGCOMM",
+    "start_date": "2027-08-16",
+    "end_date": "2027-08-20",
+    "format": "in-person",
+    "location": "Zurich, Switzerland",
+    "source_url": "https://conferences.sigcomm.org/sigcomm/2027/",
+    "description": "The flagship annual conference of the Special Interest Group on Data Communication (SIGCOMM) on the applications, technologies, architectures, and protocols for computer communication.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Verified Core A* ranking in CORE database",
+      "Official ACM conference domain"
+    ],
+    "status": "published",
+    "created_at": "2026-09-08T08:20:28.863Z",
+    "updated_at": "2026-09-08T08:20:28.863Z"
+  },
+  {
+    "id": "opp-1788855628866-xgyim",
+    "title": "Anthropic AI Alignment & Interpretability Fellowship / Internship",
+    "type": "internship",
+    "conference_tier": null,
+    "organizer": "Anthropic",
+    "start_date": "2026-09-15",
+    "end_date": "2026-11-30",
+    "format": "hybrid",
+    "location": "San Francisco, CA / London, UK",
+    "source_url": "https://www.anthropic.com/careers",
+    "description": "Paid research and engineering residency working on frontier model interpretability, mechanistic steering, and constitutional AI evaluation.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Direct official careers URL",
+      "Clear application window specified"
+    ],
+    "status": "published",
+    "created_at": "2026-09-08T08:20:28.863Z",
+    "updated_at": "2026-09-08T08:20:28.863Z"
+  },
+  {
+    "id": "opp-1788855628866-amkjo",
+    "title": "CVPR 2027: IEEE/CVF Conference on Computer Vision and Pattern Recognition",
+    "type": "conference",
+    "conference_tier": "Core A*",
+    "organizer": "IEEE Computer Society & CVF",
+    "start_date": "2027-06-20",
+    "end_date": "2027-06-26",
+    "format": "in-person",
+    "location": "Seattle, WA, USA",
+    "source_url": "https://cvpr.thecvf.com",
+    "description": "The premier annual computer vision event comprising the main conference and several co-located workshops and short courses.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Verified Core A* ranking",
+      "Official CVF foundation portal"
+    ],
+    "status": "published",
+    "created_at": "2026-09-08T08:20:28.863Z",
+    "updated_at": "2026-09-08T08:20:28.863Z"
+  },
+  {
+    "id": "opp-1788855628866-tsqiv",
+    "title": "Rust Foundation Systems Programming & Concurrency Workshop",
+    "type": "workshop",
+    "conference_tier": null,
+    "organizer": "Rust Foundation",
+    "start_date": "2026-10-24",
+    "end_date": "2026-10-25",
+    "format": "online",
+    "location": null,
+    "source_url": "https://rust-lang.org/learn",
+    "description": "Deep dive into lock-free concurrency, asynchronous runtime internals (Tokio), and embedded no_std development in Rust.",
+    "discovery_confidence": "high",
+    "confidence_reasons": [
+      "Official Rust community technical workshop",
+      "Standardized course agenda"
+    ],
+    "status": "published",
+    "created_at": "2026-09-08T08:20:28.863Z",
+    "updated_at": "2026-09-08T08:20:28.863Z"
+  },
+  {
+    "id": "opp-1788855628867-zyg00",
+    "title": "Deep Learning Systems Hackathon (Unconfirmed Dates)",
+    "type": "hackathon",
+    "conference_tier": null,
+    "organizer": "AI Hacker Guild",
+    "start_date": "2026-11-15",
+    "end_date": "2026-11-17",
+    "format": "online",
+    "location": null,
+    "source_url": "https://forum.tensorcommunity.org/t/hackathon-announcement",
+    "description": "Discovered from an open developer forum post. Team registration link is not yet finalized.",
+    "discovery_confidence": "low",
+    "confidence_reasons": [
+      "Source URL is a community forum post rather than an event platform",
+      "Registration details ambiguous"
+    ],
+    "status": "published",
+    "created_at": "2026-09-08T08:20:28.863Z",
+    "updated_at": "2026-09-08T08:20:28.863Z"
+  }
+]

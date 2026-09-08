@@ -1,1 +1,74 @@
-[]
+[
+  {
+    "id": "run-1788855639743",
+    "timestamp": "2026-09-08T08:20:39.743Z",
+    "status": "success",
+    "events_scanned": 6,
+    "events_added": 0,
+    "duplicates_skipped": 6,
+    "events_archived": 0,
+    "low_confidence_count": 0,
+    "errors": [],
+    "details": {
+      "added_titles": [],
+      "skipped_titles": [
+        "KubeHacks 2026: Cloud Native Systems Hackathon (Matches: KubeHacks 2026: Cloud Native Systems Hackathon)",
+        "ACM SIGCOMM 2027: Annual Conference on Data Communication (Matches: ACM SIGCOMM 2027: Annual Conference on Data Communication)",
+        "Anthropic AI Alignment & Interpretability Fellowship / Internship (Matches: Anthropic AI Alignment & Interpretability Fellowship / Internship)",
+        "CVPR 2027: IEEE/CVF Conference on Computer Vision and Pattern Recognition (Matches: CVPR 2027: IEEE/CVF Conference on Computer Vision and Pattern Recognition)",
+        "Rust Foundation Systems Programming & Concurrency Workshop (Matches: Rust Foundation Systems Programming & Concurrency Workshop)",
+        "Deep Learning Systems Hackathon (Unconfirmed Dates) (Matches: Deep Learning Systems Hackathon (Unconfirmed Dates))"
+      ]
+    }
+  },
+  {
+    "id": "run-1788855628863",
+    "timestamp": "2026-09-08T08:20:28.863Z",
+    "status": "success",
+    "events_scanned": 6,
+    "events_added": 6,
+    "duplicates_skipped": 0,
+    "events_archived": 0,
+    "low_confidence_count": 1,
+    "errors": [],
+    "details": {
+      "added_titles": [
+        "KubeHacks 2026: Cloud Native Systems Hackathon",
+        "ACM SIGCOMM 2027: Annual Conference on Data Communication",
+        "Anthropic AI Alignment & Interpretability Fellowship / Internship",
+        "CVPR 2027: IEEE/CVF Conference on Computer Vision and Pattern Recognition",
+        "Rust Foundation Systems Programming & Concurrency Workshop",
+        "Deep Learning Systems Hackathon (Unconfirmed Dates)"
+      ],
+      "skipped_titles": []
+    }
+  },
+  {
+    "id": "log-seed",
+    "timestamp": "2026-09-08T08:20:28.867Z",
+    "status": "success",
+    "events_scanned": 12,
+    "events_added": 12,
+    "duplicates_skipped": 0,
+    "events_archived": 0,
+    "low_confidence_count": 3,
+    "errors": [],
+    "details": {
+      "added_titles": [
+        "NeurIPS 2026: Conference on Neural Information Processing Systems",
+        "HackMIT 2026",
+        "Google DeepMind Research Scientist & Engineering Internships 2027",
+        "ICSE 2027: International Conference on Software Engineering",
+        "ETHGlobal San Francisco 2026",
+        "Advanced LLM Fine-Tuning & Agentic Workflows Workshop",
+        "EMNLP 2026: Empirical Methods in Natural Language Processing",
+        "CalHacks 13.0",
+        "Meta Software Engineer Intern - Summer 2027",
+        "International Web & Intelligent Computing Summit (IWICS 2026)",
+        "Autonomous Systems & Edge AI Hackathon",
+        "Generative Audio & DSP Masterclass"
+      ],
+      "skipped_titles": []
+    }
+  }
+]
