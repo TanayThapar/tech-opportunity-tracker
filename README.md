@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tech Opportunity Tracker & Automated Discovery Pipeline
 
-## Getting Started
+A public web application tracking upcoming tech opportunities: **hackathons** (company-run & collegiate), **conferences** (with Core A*, Core A, Core B tiering), **skill-building workshops**, and **internship openings**. 
 
-First, run the development server:
+Includes a public interactive month calendar & list view, fuzzy deduplication discovery pipeline, and transparent audit logging.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 1. Tech Stack & Hosting Approach
+
+- **Frontend & Framework**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4.
+- **Components & Icons**: Lucide React, `date-fns` for calendar arithmetic.
+- **Deduplication Engine**: Weighted Levenshtein ratio (`fast-levenshtein`) over normalized `[title + date + organizer]` with containment detection and candidate tolerance window.
+- **Persistence**: Server-side storage engine with fallback JSON state and ready-to-plug Supabase PostgreSQL client (`@supabase/supabase-js`).
+- **Hosting**: Native zero-config deployment on **Vercel** or **Netlify**.
+
+---
+
+## 2. Cron Schedule Configuration
+
+The automated pipeline schedule is configured in [`vercel.json`](./vercel.json):
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/pipeline/run",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Default Schedule**: `0 2 * * *` (Runs automatically once daily at 02:00 UTC).
+- **To change the interval**:
+  - Weekly on Mondays: `"schedule": "0 2 * * 1"`
+  - Every 12 hours: `"schedule": "0 */12 * * *"`
+  - Every 6 hours: `"schedule": "0 */6 * * *"`
+- **Manual Trigger**: Click the **"Run Pipeline"** button in the top navigation bar or send a `POST` request to `/api/pipeline/run`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 3. Data Model & Architecture
 
-## Learn More
+Each opportunity conforms to the following schema:
+- `title`: string
+- `type`: `hackathon` | `conference` | `workshop` | `internship`
+- `conference_tier`: `Core A*` | `Core A` | `Core B` | `Core C` | `Industry / Non-Academic` (customizable)
+- `organizer`: string
+- `start_date`, `end_date`: ISO format (or application deadline for internships)
+- `format`: `online` | `in-person` | `hybrid`
+- `location`: string (if in-person or hybrid)
+- `source_url`: Mandatory URL where the opportunity was discovered (never fabricated)
+- `description`: 2-3 sentence overview
+- `discovery_confidence`: `high` | `low`
+- `confidence_reasons`: Array of diagnostic reasons if flagged for review
+- `status`: `published` | `needs_review` | `archived`
 
-To learn more about Next.js, take a look at the following resources:
+### Key Design Tenet: Auto-Publishing with Review Backlog
+- **ALL events auto-publish immediately (`status: 'published'`)** regardless of confidence.
+- Events with tentative dates, unverified community sources, or near-duplicate similarities receive `discovery_confidence: 'low'` and appear in both the main calendar and the dedicated **"/needs-review"** backlog for spot-checking.
+- Past events are automatically transitioned to `status: 'archived'` by the pipeline on each run.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 4. Local Development
 
-## Deploy on Vercel
+```bash
+# Install dependencies
+npm install
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Run development server
+npm run dev
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Build for production
+npm run build
+```
+
+Open [http://localhost:3000](http://localhost:3000) to view the calendar, feed, and pipeline controls.
