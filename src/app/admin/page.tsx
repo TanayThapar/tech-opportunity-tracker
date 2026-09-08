@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import { TechOpportunity, PipelineRunLog } from '@/types';
-import { getCurrentUser, login } from '@/lib/auth';
+import { getCurrentUser, isWhitelistedAdmin, login, ADMIN_WHITELIST } from '@/lib/auth';
 import { UserProfile } from '@/types/auth';
 import {
   ShieldAlert,
@@ -20,6 +20,8 @@ import {
   Cpu,
   CheckCircle,
   ExternalLink,
+  ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
@@ -57,8 +59,8 @@ export default function AdminAnalyticsDashboard() {
     fetchData();
   }, []);
 
-  const handleAdminAuthOverride = () => {
-    const res = login('tanay@techradar.dev', 'admin');
+  const handleAdminAuthOverride = (handle: string) => {
+    const res = login(handle);
     if (res.user) setUser(res.user);
   };
 
@@ -120,8 +122,10 @@ export default function AdminAnalyticsDashboard() {
     return { totalScanned, totalAdded, totalSkipped, totalArchived };
   }, [logs]);
 
-  // If not authenticated as admin, show access wall
-  if (!user || user.role !== 'admin') {
+  // Strict whitelist check: Only TanayThapar and Sanvi850
+  const isAuthorized = user && (isWhitelistedAdmin(user.handle) || isWhitelistedAdmin(user.email));
+
+  if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-[#070b0e] text-zinc-200 font-mono flex flex-col">
         <Navbar />
@@ -130,22 +134,46 @@ export default function AdminAnalyticsDashboard() {
             <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/50">
               <Lock className="w-6 h-6" />
             </div>
-            <h2 className="text-lg font-bold text-white tracking-tight">RESTRICTED_ACCESS // 403 FORBIDDEN</h2>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              This analytics backend is restricted to the administrator. Authenticate with your administrative identity to inspect engine telemetry and pipeline KPIs.
-            </p>
+            <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+              WHITELIST_RESTRICTION // 403 FORBIDDEN
+            </h2>
+            <div className="p-3 bg-zinc-950 rounded border border-zinc-800 text-xs text-zinc-400 text-left space-y-1">
+              <div className="text-zinc-500 font-bold uppercase text-[10px]">ACCESS WHITELIST POLICY:</div>
+              <p>
+                This backend tab is strictly restricted to whitelisted administrators:
+              </p>
+              <div className="flex gap-2 text-purple-400 font-bold pt-1">
+                <span>• @TanayThapar</span>
+                <span>• @Sanvi850</span>
+              </div>
+              {user && (
+                <div className="pt-1.5 text-zinc-500 text-[11px] border-t border-zinc-800/80">
+                  Current session: <span className="text-zinc-300">@{user.handle}</span> (Standard User)
+                </div>
+              )}
+            </div>
+
             <div className="pt-2 flex flex-col gap-2">
-              <button
-                onClick={handleAdminAuthOverride}
-                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs rounded transition-colors"
-              >
-                AUTHORIZE AS ADMIN (TANAY)
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleAdminAuthOverride('TanayThapar')}
+                  className="py-2 bg-purple-950 hover:bg-purple-900 border border-purple-500/60 text-purple-300 font-bold text-xs rounded transition-colors"
+                >
+                  LOGIN: @TanayThapar
+                </button>
+                <button
+                  onClick={() => handleAdminAuthOverride('Sanvi850')}
+                  className="py-2 bg-purple-950 hover:bg-purple-900 border border-purple-500/60 text-purple-300 font-bold text-xs rounded transition-colors"
+                >
+                  LOGIN: @Sanvi850
+                </button>
+              </div>
+
               <Link
-                href="/login"
+                href="/"
                 className="text-xs text-zinc-500 hover:text-zinc-300 py-1"
               >
-                Sign in with another account
+                &lt;- Return to Public Calendar
               </Link>
             </div>
           </div>
@@ -168,14 +196,15 @@ export default function AdminAnalyticsDashboard() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-bold text-purple-300 tracking-tight">
-                  ADMIN_BACKEND // TELEMETRY & STATISTICAL INTELLIGENCE
+                  ADMIN_BACKEND // STATISTICAL TRACKING & TELEMETRY
                 </h1>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-500/70">
-                  ROOT_ACCESS
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-500/70 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span>WHITELISTED: @{user?.handle}</span>
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Authenticated session: <span className="text-emerald-400">@{user.handle}</span> ({user.email}) • Real-time pipeline audit & community engagement KPIs.
+                Authorized for <strong className="text-emerald-400">TanayThapar</strong> & <strong className="text-emerald-400">Sanvi850</strong>. Real-time pipeline audit & visual metrics.
               </p>
             </div>
           </div>
@@ -185,7 +214,7 @@ export default function AdminAnalyticsDashboard() {
               href="/"
               className="px-3 py-1.5 rounded bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-xs text-zinc-400 hover:text-white"
             >
-              Public Calendar
+              Calendar Feed
             </Link>
             <Link
               href="/pipeline-logs"
@@ -370,7 +399,7 @@ export default function AdminAnalyticsDashboard() {
                 <span className="text-white font-bold">{logs.length} cycles</span>
               </div>
               <div className="flex justify-between py-1 border-b border-zinc-800/50">
-                <span className="text-zinc-500">LIFETIME RAW CANDIDATES SCANNED:</span>
+                <span className="text-zinc-500">LIFETIME CANDIDATES SCANNED:</span>
                 <span className="text-white font-bold">{pipelineMetrics.totalScanned} candidates</span>
               </div>
               <div className="flex justify-between py-1 border-b border-zinc-800/50">
@@ -393,7 +422,7 @@ export default function AdminAnalyticsDashboard() {
         <div className="p-5 rounded-xl bg-[#0b1016] border border-zinc-800 space-y-3">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <h3 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">
-              // RAW_EVENT_REGISTRY & CONFIDENCE HEALTH
+              // RAW_EVENT_REGISTRY & CONFIDENCE AUDIT
             </h3>
             <span className="text-xs text-zinc-500">Showing top {opportunities.slice(0, 8).length} events</span>
           </div>

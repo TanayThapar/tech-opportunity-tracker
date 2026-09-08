@@ -5,27 +5,46 @@ import { UserProfile, UserRole } from '@/types/auth';
 const AUTH_STORAGE_KEY = 'techradar_auth_session_v1';
 const USERS_DB_KEY = 'techradar_registered_users_v1';
 
-// Seed admin account
-const DEFAULT_ADMIN: UserProfile = {
-  id: 'usr-admin-1',
-  email: 'tanay@techradar.dev',
-  name: 'Tanay Thapar',
-  handle: 'tanay',
-  role: 'admin',
-  createdAt: '2026-09-01T00:00:00Z',
-};
+// Strict Admin Whitelist: TanayThapar and Sanvi850
+export const ADMIN_WHITELIST: string[] = ['tanaythapar', 'sanvi850'];
+
+export function isWhitelistedAdmin(identifier: string): boolean {
+  if (!identifier) return false;
+  const clean = identifier.trim().toLowerCase().replace('@', '');
+  return ADMIN_WHITELIST.some(allowed => clean === allowed.toLowerCase());
+}
+
+// Initial registered admins
+const SEED_USERS: UserProfile[] = [
+  {
+    id: 'usr-admin-tanay',
+    email: 'tanaythapar@gmail.com',
+    name: 'Tanay Thapar',
+    handle: 'TanayThapar',
+    role: 'admin',
+    createdAt: '2026-09-01T00:00:00Z',
+  },
+  {
+    id: 'usr-admin-sanvi',
+    email: 'sanvi850@gmail.com',
+    name: 'Sanvi',
+    handle: 'Sanvi850',
+    role: 'admin',
+    createdAt: '2026-09-01T00:00:00Z',
+  },
+];
 
 function getRegisteredUsers(): UserProfile[] {
-  if (typeof window === 'undefined') return [DEFAULT_ADMIN];
+  if (typeof window === 'undefined') return SEED_USERS;
   try {
     const raw = localStorage.getItem(USERS_DB_KEY);
     if (!raw) {
-      localStorage.setItem(USERS_DB_KEY, JSON.stringify([DEFAULT_ADMIN]));
-      return [DEFAULT_ADMIN];
+      localStorage.setItem(USERS_DB_KEY, JSON.stringify(SEED_USERS));
+      return SEED_USERS;
     }
     return JSON.parse(raw);
   } catch {
-    return [DEFAULT_ADMIN];
+    return SEED_USERS;
   }
 }
 
@@ -39,23 +58,27 @@ export function getCurrentUser(): UserProfile | null {
   }
 }
 
-export function login(email: string, roleRequested?: UserRole): { success: boolean; user?: UserProfile; error?: string } {
-  const cleanEmail = email.trim().toLowerCase();
-  if (!cleanEmail) return { success: false, error: 'Email cannot be empty' };
+export function login(identifier: string): { success: boolean; user?: UserProfile; error?: string } {
+  const clean = identifier.trim();
+  if (!clean) return { success: false, error: 'Username, Handle, or Email cannot be empty' };
 
   const users = getRegisteredUsers();
-  let user = users.find(u => u.email.toLowerCase() === cleanEmail);
+  const lowerClean = clean.toLowerCase().replace('@', '');
 
-  // If signing in with the designated owner address or requesting admin explicitly
-  const isAdmin = cleanEmail.includes('tanay') || cleanEmail.includes('admin') || roleRequested === 'admin';
+  // Check if identifier matches handle or email
+  let user = users.find(
+    u => u.handle.toLowerCase() === lowerClean || u.email.toLowerCase() === lowerClean
+  );
+
+  const isAdmin = isWhitelistedAdmin(clean) || (user && isWhitelistedAdmin(user.handle));
 
   if (!user) {
-    // Auto-create profile for seamless login/signup
+    // Register on the fly
     user = {
       id: `usr-${Date.now()}`,
-      email: cleanEmail,
-      name: cleanEmail.split('@')[0],
-      handle: cleanEmail.split('@')[0],
+      email: clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@user.radar`,
+      name: clean,
+      handle: clean.replace('@', ''),
       role: isAdmin ? 'admin' : 'user',
       createdAt: new Date().toISOString(),
     };
@@ -63,8 +86,11 @@ export function login(email: string, roleRequested?: UserRole): { success: boole
     if (typeof window !== 'undefined') {
       localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
     }
-  } else if (isAdmin && user.role !== 'admin') {
-    user.role = 'admin';
+  } else {
+    // Ensure whitelisted users always have role='admin'
+    if (isAdmin) {
+      user.role = 'admin';
+    }
   }
 
   if (typeof window !== 'undefined') {
@@ -75,23 +101,28 @@ export function login(email: string, roleRequested?: UserRole): { success: boole
   return { success: true, user };
 }
 
-export function signup(name: string, email: string, handle: string): { success: boolean; user?: UserProfile; error?: string } {
-  const cleanEmail = email.trim().toLowerCase();
-  if (!cleanEmail) return { success: false, error: 'Email is required' };
+export function signup(name: string, identifier: string): { success: boolean; user?: UserProfile; error?: string } {
+  const clean = identifier.trim();
+  if (!clean) return { success: false, error: 'Username or Email is required' };
   if (!name.trim()) return { success: false, error: 'Name is required' };
 
   const users = getRegisteredUsers();
-  const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
+  const lowerClean = clean.toLowerCase().replace('@', '');
+
+  const existing = users.find(
+    u => u.handle.toLowerCase() === lowerClean || u.email.toLowerCase() === lowerClean
+  );
   if (existing) {
-    return login(cleanEmail);
+    return login(clean);
   }
 
-  const isAdmin = cleanEmail.includes('tanay') || cleanEmail.includes('admin');
+  const isAdmin = isWhitelistedAdmin(clean);
+
   const newUser: UserProfile = {
     id: `usr-${Date.now()}`,
-    email: cleanEmail,
+    email: clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@user.radar`,
     name: name.trim(),
-    handle: handle.trim() || cleanEmail.split('@')[0],
+    handle: clean.replace('@', ''),
     role: isAdmin ? 'admin' : 'user',
     createdAt: new Date().toISOString(),
   };

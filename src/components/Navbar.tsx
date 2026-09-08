@@ -9,13 +9,12 @@ import {
   AlertCircle,
   History,
   RefreshCw,
-  User,
   LogOut,
   Shield,
   BarChart3,
   LogIn,
 } from 'lucide-react';
-import { getCurrentUser, logout } from '@/lib/auth';
+import { getCurrentUser, logout, isWhitelistedAdmin } from '@/lib/auth';
 import { UserProfile } from '@/types/auth';
 
 interface NavbarProps {
@@ -42,8 +41,10 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
 
   const handleLogout = () => {
     logout();
-    router.push('/');
+    router.push('/login');
   };
+
+  const isWhitelisted = user && (isWhitelistedAdmin(user.handle) || isWhitelistedAdmin(user.email));
 
   return (
     <header className="sticky top-0 z-50 bg-[#080d12]/90 backdrop-blur-md border-b border-zinc-800 font-mono">
@@ -54,7 +55,7 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
             <Link href="/" className="flex items-center space-x-2 group">
               <span className="text-emerald-400 font-bold flex items-center gap-1.5 text-sm sm:text-base">
                 <Terminal className="w-4 h-4 text-emerald-400" />
-                <span>tanay@techradar:~$</span>
+                <span>{user ? user.handle.toLowerCase() : 'guest'}@techradar:~$</span>
                 <span className="terminal-cursor" />
               </span>
             </Link>
@@ -98,8 +99,8 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
               <span className="hidden md:inline">/logs</span>
             </Link>
 
-            {/* Admin Backend link - highlighted if admin */}
-            {user?.role === 'admin' ? (
+            {/* Admin Backend tab - strictly styled & tagged */}
+            {isWhitelisted ? (
               <Link
                 href="/admin"
                 className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded transition-all border shadow-sm ${
@@ -110,16 +111,16 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
                 title="Admin Visualizations & Analytics Backend"
               >
                 <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
-                <span className="font-bold">/admin_analytics</span>
+                <span className="font-bold">/admin</span>
               </Link>
             ) : (
               <Link
                 href="/admin"
                 className="flex items-center space-x-1 px-2 py-1.5 rounded text-zinc-500 hover:text-purple-400 text-[11px]"
-                title="Backend Admin Dashboard"
+                title="Admin Backend (Whitelisted: TanayThapar, Sanvi850)"
               >
                 <Shield className="w-3 h-3 text-zinc-500" />
-                <span className="hidden lg:inline">Backend</span>
+                <span className="hidden lg:inline">/admin</span>
               </Link>
             )}
 
@@ -135,7 +136,7 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
               </button>
             )}
 
-            {/* Auth / Profile action */}
+            {/* Auth status */}
             {user ? (
               <div className="flex items-center gap-1.5 pl-1">
                 <span className="text-[11px] text-zinc-400 hidden sm:inline font-mono">
@@ -144,7 +145,7 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
                 <button
                   onClick={handleLogout}
                   className="p-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
-                  title="Log out"
+                  title="Log out and return to login gate"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
