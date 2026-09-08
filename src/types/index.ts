@@ -36,7 +36,7 @@ export interface TechOpportunity {
   status: OpportunityStatus;
   created_at: string;
   updated_at: string;
-  // Local/community interactions
+  submitted_by?: string; // Handle/identity of live user who submitted
   starred_count?: number;
   participants_count?: number;
 }

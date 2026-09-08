@@ -5,8 +5,9 @@ import Navbar from '@/components/Navbar';
 import FilterBar from '@/components/FilterBar';
 import OpportunityCard from '@/components/OpportunityCard';
 import CalendarView from '@/components/CalendarView';
+import SubmitOpportunityModal from '@/components/SubmitOpportunityModal';
 import { TechOpportunity, OpportunityType, OpportunityFormat } from '@/types';
-import { Calendar, LayoutList, Terminal, AlertCircle, Compass, Star, UserCheck } from 'lucide-react';
+import { Calendar, LayoutList, Terminal, AlertCircle, Compass, Star, UserCheck, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { getAllInteractions } from '@/lib/interactions';
@@ -24,6 +25,7 @@ export default function HomePage() {
   const [isRunningPipeline, setIsRunningPipeline] = useState(false);
   const [pipelineToast, setPipelineToast] = useState<string | null>(null);
   const [interactionVersion, setInteractionVersion] = useState(0);
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
 
   const fetchOpportunities = async () => {
     try {
@@ -138,6 +140,13 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* Live Submission Modal */}
+      <SubmitOpportunityModal
+        isOpen={isSubmitModalOpen}
+        onClose={() => setIsSubmitModalOpen(false)}
+        onSubmitted={fetchOpportunities}
+      />
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-5">
         {/* Terminal Header Info */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
@@ -145,17 +154,26 @@ export default function HomePage() {
             <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
               <span>SYSTEM: LIVE_RADAR</span>
               <span>•</span>
-              <span className="text-emerald-400">STATUS: ONLINE</span>
+              <span className="text-emerald-400">ZERO_SAMPLE_DATA</span>
               <span>•</span>
-              <span>INDEXED: {opportunities.length} EVENTS</span>
+              <span>INDEXED: {opportunities.length} LIVE EVENTS</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               <span className="text-emerald-400">&gt;</span> TECH_OPPORTUNITY_TRACKER
             </h1>
           </div>
 
-          {/* Quick Filters & View Switcher */}
+          {/* Quick Filters, View Switcher & Submit Action */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Live Submit Button */}
+            <button
+              onClick={() => setIsSubmitModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-black text-xs font-bold transition-all shadow-sm"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>+ SUBMIT_EVENT</span>
+            </button>
+
             {/* Starred filter */}
             <button
               onClick={() => setOnlyStarred(!onlyStarred)}
@@ -237,15 +255,30 @@ export default function HomePage() {
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center text-zinc-500 text-xs">
             <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-3" />
-            <span>// Loading event data stream...</span>
+            <span>// Loading live event registry...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center bg-[#090e13] rounded-xl border border-zinc-800 p-8">
-            <Compass className="w-8 h-8 mx-auto text-zinc-600 mb-2" />
-            <h3 className="text-sm font-bold text-zinc-300">// 0 opportunities match current query criteria</h3>
-            <p className="text-xs text-zinc-500 mt-1">
-              Reset your active filters or clear search query to inspect other opportunities.
+          <div className="py-16 text-center bg-[#090e13] rounded-xl border border-zinc-800 p-8 space-y-3">
+            <Compass className="w-8 h-8 mx-auto text-zinc-600" />
+            <h3 className="text-sm font-bold text-zinc-300">// 0 LIVE OPPORTUNITIES IN REGISTRY</h3>
+            <p className="text-xs text-zinc-500 max-w-md mx-auto">
+              Sample data has been completely eliminated. Submit a real live opportunity using the button below or trigger the automated discovery crawler.
             </p>
+            <div className="pt-2 flex justify-center gap-3">
+              <button
+                onClick={() => setIsSubmitModalOpen(true)}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs rounded transition-colors flex items-center gap-1.5"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>+ SUBMIT FIRST LIVE EVENT</span>
+              </button>
+              <button
+                onClick={handleTriggerPipeline}
+                className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs rounded border border-zinc-700 transition-colors"
+              >
+                RUN WEB DISCOVERY PIPELINE
+              </button>
+            </div>
           </div>
         ) : viewMode === 'calendar' ? (
           <CalendarView opportunities={filtered} />
@@ -267,7 +300,7 @@ export default function HomePage() {
       <footer className="border-t border-zinc-800/80 py-4 text-xs text-zinc-500 bg-[#080d12]/90">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 font-mono">
           <p>
-            <span className="text-emerald-400">techradar</span> v1.2.0 • terminal edition
+            <span className="text-emerald-400">techradar</span> v1.3.0 • live user edition
           </p>
           <div className="flex items-center gap-4">
             <Link href="/needs-review" className="hover:text-zinc-300">

@@ -14,37 +14,13 @@ export function isWhitelistedAdmin(identifier: string): boolean {
   return ADMIN_WHITELIST.some(allowed => clean === allowed.toLowerCase());
 }
 
-// Initial registered admins
-const SEED_USERS: UserProfile[] = [
-  {
-    id: 'usr-admin-tanay',
-    email: 'tanaythapar@gmail.com',
-    name: 'Tanay Thapar',
-    handle: 'TanayThapar',
-    role: 'admin',
-    createdAt: '2026-09-01T00:00:00Z',
-  },
-  {
-    id: 'usr-admin-sanvi',
-    email: 'sanvi850@gmail.com',
-    name: 'Sanvi',
-    handle: 'Sanvi850',
-    role: 'admin',
-    createdAt: '2026-09-01T00:00:00Z',
-  },
-];
-
 function getRegisteredUsers(): UserProfile[] {
-  if (typeof window === 'undefined') return SEED_USERS;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(USERS_DB_KEY);
-    if (!raw) {
-      localStorage.setItem(USERS_DB_KEY, JSON.stringify(SEED_USERS));
-      return SEED_USERS;
-    }
-    return JSON.parse(raw);
+    return raw ? JSON.parse(raw) : [];
   } catch {
-    return SEED_USERS;
+    return [];
   }
 }
 
@@ -65,7 +41,6 @@ export function login(identifier: string): { success: boolean; user?: UserProfil
   const users = getRegisteredUsers();
   const lowerClean = clean.toLowerCase().replace('@', '');
 
-  // Check if identifier matches handle or email
   let user = users.find(
     u => u.handle.toLowerCase() === lowerClean || u.email.toLowerCase() === lowerClean
   );
@@ -73,7 +48,6 @@ export function login(identifier: string): { success: boolean; user?: UserProfil
   const isAdmin = isWhitelistedAdmin(clean) || (user && isWhitelistedAdmin(user.handle));
 
   if (!user) {
-    // Register on the fly
     user = {
       id: `usr-${Date.now()}`,
       email: clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@user.radar`,
@@ -87,7 +61,6 @@ export function login(identifier: string): { success: boolean; user?: UserProfil
       localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
     }
   } else {
-    // Ensure whitelisted users always have role='admin'
     if (isAdmin) {
       user.role = 'admin';
     }
