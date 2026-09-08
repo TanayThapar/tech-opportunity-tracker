@@ -1,9 +1,22 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Terminal, Calendar, AlertCircle, History, RefreshCw, Star } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import {
+  Terminal,
+  Calendar,
+  AlertCircle,
+  History,
+  RefreshCw,
+  User,
+  LogOut,
+  Shield,
+  BarChart3,
+  LogIn,
+} from 'lucide-react';
+import { getCurrentUser, logout } from '@/lib/auth';
+import { UserProfile } from '@/types/auth';
 
 interface NavbarProps {
   onTriggerPipeline?: () => void;
@@ -12,6 +25,25 @@ interface NavbarProps {
 
 export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<UserProfile | null>(null);
+
+  const syncUser = () => {
+    setUser(getCurrentUser());
+  };
+
+  useEffect(() => {
+    syncUser();
+    window.addEventListener('techradar_auth_change', syncUser);
+    return () => {
+      window.removeEventListener('techradar_auth_change', syncUser);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    router.push('/');
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-[#080d12]/90 backdrop-blur-md border-b border-zinc-800 font-mono">
@@ -32,7 +64,7 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
           <nav className="flex items-center space-x-1 sm:space-x-2 text-xs">
             <Link
               href="/"
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors border ${
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded transition-colors border ${
                 pathname === '/'
                   ? 'bg-zinc-800 text-emerald-400 border-emerald-500/40'
                   : 'text-zinc-400 hover:text-zinc-200 border-transparent hover:bg-zinc-900'
@@ -44,38 +76,87 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
 
             <Link
               href="/needs-review"
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors border ${
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded transition-colors border ${
                 pathname === '/needs-review'
                   ? 'bg-amber-950/40 text-amber-300 border-amber-500/50'
                   : 'text-zinc-400 hover:text-amber-300 border-transparent hover:bg-zinc-900'
               }`}
             >
               <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-              <span>/review</span>
+              <span className="hidden sm:inline">/review</span>
             </Link>
 
             <Link
               href="/pipeline-logs"
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded transition-colors border ${
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded transition-colors border ${
                 pathname === '/pipeline-logs'
                   ? 'bg-zinc-800 text-cyan-400 border-cyan-500/40'
                   : 'text-zinc-400 hover:text-zinc-200 border-transparent hover:bg-zinc-900'
               }`}
             >
               <History className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">/pipeline-logs</span>
+              <span className="hidden md:inline">/logs</span>
             </Link>
+
+            {/* Admin Backend link - highlighted if admin */}
+            {user?.role === 'admin' ? (
+              <Link
+                href="/admin"
+                className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded transition-all border shadow-sm ${
+                  pathname === '/admin'
+                    ? 'bg-purple-950 border-purple-500 text-purple-300 ring-1 ring-purple-500'
+                    : 'bg-purple-950/40 border-purple-500/50 text-purple-300 hover:bg-purple-900/50'
+                }`}
+                title="Admin Visualizations & Analytics Backend"
+              >
+                <BarChart3 className="w-3.5 h-3.5 text-purple-400" />
+                <span className="font-bold">/admin_analytics</span>
+              </Link>
+            ) : (
+              <Link
+                href="/admin"
+                className="flex items-center space-x-1 px-2 py-1.5 rounded text-zinc-500 hover:text-purple-400 text-[11px]"
+                title="Backend Admin Dashboard"
+              >
+                <Shield className="w-3 h-3 text-zinc-500" />
+                <span className="hidden lg:inline">Backend</span>
+              </Link>
+            )}
 
             {onTriggerPipeline && (
               <button
                 onClick={onTriggerPipeline}
                 disabled={isRunningPipeline}
-                className="ml-1 sm:ml-2 flex items-center space-x-1.5 px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-black text-xs font-bold transition-all disabled:opacity-50"
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-black text-xs font-bold transition-all disabled:opacity-50"
                 title="Run web discovery pipeline"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isRunningPipeline ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">{isRunningPipeline ? 'RUNNING...' : 'DISCOVER_NOW'}</span>
+                <span className="hidden sm:inline">{isRunningPipeline ? 'RUNNING...' : 'DISCOVER'}</span>
               </button>
+            )}
+
+            {/* Auth / Profile action */}
+            {user ? (
+              <div className="flex items-center gap-1.5 pl-1">
+                <span className="text-[11px] text-zinc-400 hidden sm:inline font-mono">
+                  @{user.handle}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="p-1.5 rounded text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
+                  title="Log out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs border border-zinc-700 transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5 text-emerald-400" />
+                <span>SIGN_IN</span>
+              </Link>
             )}
           </nav>
         </div>
