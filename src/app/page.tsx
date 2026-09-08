@@ -6,24 +6,28 @@ import FilterBar from '@/components/FilterBar';
 import OpportunityCard from '@/components/OpportunityCard';
 import CalendarView from '@/components/CalendarView';
 import { TechOpportunity, OpportunityType, OpportunityFormat } from '@/types';
-import { Calendar, LayoutList, Sparkles, AlertCircle, Compass } from 'lucide-react';
+import { Calendar, LayoutList, Terminal, AlertCircle, Compass, Star, UserCheck } from 'lucide-react';
 import Link from 'next/link';
+import { motion } from 'motion/react';
+import { getAllInteractions } from '@/lib/interactions';
 
 export default function HomePage() {
   const [opportunities, setOpportunities] = useState<TechOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list');
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [selectedType, setSelectedType] = useState<OpportunityType | 'all'>('all');
   const [selectedTier, setSelectedTier] = useState<string | 'all'>('all');
   const [selectedFormat, setSelectedFormat] = useState<OpportunityFormat | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [onlyStarred, setOnlyStarred] = useState(false);
+  const [onlyAttending, setOnlyAttending] = useState(false);
   const [isRunningPipeline, setIsRunningPipeline] = useState(false);
   const [pipelineToast, setPipelineToast] = useState<string | null>(null);
+  const [interactionVersion, setInteractionVersion] = useState(0);
 
   const fetchOpportunities = async () => {
     try {
       setLoading(true);
-      // Main view fetches status=published
       const res = await fetch('/api/opportunities?status=published');
       const json = await res.json();
       if (json.success) {
@@ -38,12 +42,19 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchOpportunities();
+    const handleInteractionChange = () => {
+      setInteractionVersion(v => v + 1);
+    };
+    window.addEventListener('techradar_interaction_change', handleInteractionChange);
+    return () => {
+      window.removeEventListener('techradar_interaction_change', handleInteractionChange);
+    };
   }, []);
 
   const handleTriggerPipeline = async () => {
     try {
       setIsRunningPipeline(true);
-      setPipelineToast('Running web discovery pipeline...');
+      setPipelineToast('Executing discovery pipeline across web feeds...');
       const res = await fetch('/api/pipeline/run', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
@@ -56,7 +67,7 @@ export default function HomePage() {
       setPipelineToast('Pipeline error: ' + err.message);
     } finally {
       setIsRunningPipeline(false);
-      setTimeout(() => setPipelineToast(null), 7000);
+      setTimeout(() => setPipelineToast(null), 6000);
     }
   };
 
@@ -76,33 +87,27 @@ export default function HomePage() {
     }
   };
 
-  // Distinct conference tiers available in data
   const tierList = useMemo(() => {
     const set = new Set<string>();
     opportunities.forEach(o => {
       if (o.conference_tier) set.add(o.conference_tier);
     });
-    // Ensure standard tiers are available options
     ['Core A*', 'Core A', 'Core B', 'Core C'].forEach(t => set.add(t));
     return Array.from(set);
   }, [opportunities]);
 
-  // Filtered opportunities
   const filtered = useMemo(() => {
+    const interactions = getAllInteractions();
+
     return opportunities.filter(item => {
-      // Type filter
-      if (selectedType !== 'all' && item.type !== selectedType) {
-        return false;
-      }
-      // Tier filter
-      if (selectedTier !== 'all' && item.conference_tier !== selectedTier) {
-        return false;
-      }
-      // Format filter
-      if (selectedFormat !== 'all' && item.format !== selectedFormat) {
-        return false;
-      }
-      // Search query
+      if (selectedType !== 'all' && item.type !== selectedType) return false;
+      if (selectedTier !== 'all' && item.conference_tier !== selectedTier) return false;
+      if (selectedFormat !== 'all' && item.format !== selectedFormat) return false;
+
+      const userInt = interactions[item.id];
+      if (onlyStarred && !userInt?.starred) return false;
+      if (onlyAttending && !userInt?.participating) return false;
+
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = item.title.toLowerCase().includes(q);
@@ -115,70 +120,101 @@ export default function HomePage() {
       }
       return true;
     });
-  }, [opportunities, selectedType, selectedTier, selectedFormat, searchQuery]);
+  }, [opportunities, selectedType, selectedTier, selectedFormat, searchQuery, onlyStarred, onlyAttending, interactionVersion]);
 
   const lowConfidenceCount = useMemo(() => {
     return opportunities.filter(o => o.discovery_confidence === 'low').length;
   }, [opportunities]);
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col">
+    <div className="min-h-screen bg-[#070b0e] text-zinc-200 font-mono flex flex-col selection:bg-emerald-500 selection:text-black">
       <Navbar onTriggerPipeline={handleTriggerPipeline} isRunningPipeline={isRunningPipeline} />
 
-      {/* Toast Alert */}
+      {/* Terminal Toast Notification */}
       {pipelineToast && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-md p-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl shadow-xl flex items-center gap-3 border border-zinc-700 animate-in fade-in slide-in-from-bottom-5">
-          <Sparkles className="w-5 h-5 text-indigo-400 dark:text-indigo-600 flex-shrink-0" />
-          <p className="text-xs font-medium">{pipelineToast}</p>
+        <div className="fixed bottom-5 right-5 z-50 max-w-md p-3.5 bg-[#0e161e] border border-emerald-500/80 text-emerald-300 rounded shadow-[0_0_20px_rgba(0,255,102,0.15)] flex items-center gap-3 text-xs">
+          <Terminal className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <p className="font-mono">{pipelineToast}</p>
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-6">
-        {/* Hero Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-5">
+        {/* Terminal Header Info */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2.5">
-              <span>Upcoming Tech Opportunities</span>
+            <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
+              <span>SYSTEM: LIVE_RADAR</span>
+              <span>•</span>
+              <span className="text-emerald-400">STATUS: ONLINE</span>
+              <span>•</span>
+              <span>INDEXED: {opportunities.length} EVENTS</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+              <span className="text-emerald-400">&gt;</span> TECH_OPPORTUNITY_TRACKER
             </h1>
-            <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1 max-w-2xl">
-              Track vetted Core A*/A/B conferences, global student & company hackathons, specialized engineering workshops, and internship openings — continuously auto-discovered.
-            </p>
           </div>
 
-          {/* View Toggle & Review Notice */}
-          <div className="flex items-center gap-3">
+          {/* Quick Filters & View Switcher */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Starred filter */}
+            <button
+              onClick={() => setOnlyStarred(!onlyStarred)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs transition-all border ${
+                onlyStarred
+                  ? 'bg-amber-950/60 border-amber-500 text-amber-300'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-amber-300'
+              }`}
+            >
+              <Star className={`w-3.5 h-3.5 ${onlyStarred ? 'fill-amber-400 text-amber-400' : ''}`} />
+              <span>STARRED</span>
+            </button>
+
+            {/* Attending filter */}
+            <button
+              onClick={() => setOnlyAttending(!onlyAttending)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs transition-all border ${
+                onlyAttending
+                  ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-emerald-300'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>MY_ATTENDANCE</span>
+            </button>
+
             {lowConfidenceCount > 0 && (
               <Link
                 href="/needs-review"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-medium hover:bg-amber-100 transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-amber-950/40 border border-amber-500/50 text-amber-300 text-xs hover:bg-amber-900/40"
               >
-                <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                <span>{lowConfidenceCount} Needs Review</span>
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>REVIEW [{lowConfidenceCount}]</span>
               </Link>
             )}
 
-            <div className="flex bg-zinc-200/80 dark:bg-zinc-800 p-1 rounded-xl">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  viewMode === 'list'
-                    ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                }`}
-              >
-                <LayoutList className="w-3.5 h-3.5" />
-                <span>Feed View</span>
-              </button>
+            {/* View Mode Switcher */}
+            <div className="flex bg-zinc-900 p-1 rounded border border-zinc-800">
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs transition-all ${
                   viewMode === 'calendar'
-                    ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                    ? 'bg-emerald-600 text-black font-bold'
+                    : 'text-zinc-400 hover:text-white'
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
-                <span>Month Calendar</span>
+                <span>CALENDAR</span>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs transition-all ${
+                  viewMode === 'list'
+                    ? 'bg-emerald-600 text-black font-bold'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                <span>FEED</span>
               </button>
             </div>
           </div>
@@ -197,24 +233,24 @@ export default function HomePage() {
           tierList={tierList}
         />
 
-        {/* Main Content Area */}
+        {/* Active Content */}
         {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center text-zinc-400">
-            <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-xs font-medium">Loading opportunities...</p>
+          <div className="py-24 flex flex-col items-center justify-center text-zinc-500 text-xs">
+            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mb-3" />
+            <span>// Loading event data stream...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8">
-            <Compass className="w-10 h-10 mx-auto text-zinc-300 dark:text-zinc-600 mb-3" />
-            <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">No opportunities match your filter</h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-              Try resetting your conference tier, event type, or keyword search.
+          <div className="py-16 text-center bg-[#090e13] rounded-xl border border-zinc-800 p-8">
+            <Compass className="w-8 h-8 mx-auto text-zinc-600 mb-2" />
+            <h3 className="text-sm font-bold text-zinc-300">// 0 opportunities match current query criteria</h3>
+            <p className="text-xs text-zinc-500 mt-1">
+              Reset your active filters or clear search query to inspect other opportunities.
             </p>
           </div>
         ) : viewMode === 'calendar' ? (
           <CalendarView opportunities={filtered} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map(item => (
               <OpportunityCard
                 key={item.id}
@@ -227,16 +263,18 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 py-6 text-center text-xs text-zinc-500 dark:text-zinc-400 bg-white/50 dark:bg-zinc-950/50">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>© 2026 Tech Opportunity Tracker • Public Calendar & Automated Pipeline</p>
+      {/* Terminal Footer */}
+      <footer className="border-t border-zinc-800/80 py-4 text-xs text-zinc-500 bg-[#080d12]/90">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 font-mono">
+          <p>
+            <span className="text-emerald-400">techradar</span> v1.2.0 • terminal edition
+          </p>
           <div className="flex items-center gap-4">
-            <Link href="/needs-review" className="hover:text-zinc-900 dark:hover:text-zinc-100">
+            <Link href="/needs-review" className="hover:text-zinc-300">
               Needs Review ({lowConfidenceCount})
             </Link>
-            <Link href="/pipeline-logs" className="hover:text-zinc-900 dark:hover:text-zinc-100">
-              Discovery Engine Logs
+            <Link href="/pipeline-logs" className="hover:text-zinc-300">
+              Pipeline Logs
             </Link>
           </div>
         </div>

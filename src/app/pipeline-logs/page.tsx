@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { PipelineRunLog } from '@/types';
-import { History, RefreshCw, CheckCircle, AlertTriangle, XCircle, ArrowLeft, ArrowUpRight } from 'lucide-react';
+import { History, RefreshCw, CheckCircle, AlertTriangle, XCircle, ArrowLeft, Terminal } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
+import { motion } from 'motion/react';
 
 export default function PipelineLogsPage() {
   const [logs, setLogs] = useState<PipelineRunLog[]>([]);
@@ -45,32 +46,32 @@ export default function PipelineLogsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col">
+    <div className="min-h-screen bg-[#070b0e] text-zinc-200 font-mono flex flex-col">
       <Navbar onTriggerPipeline={triggerRun} isRunningPipeline={isTriggering} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-5">
         <div>
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-indigo-600 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Public Calendar & Feed</span>
+            <span>&lt;- cd .. (return to calendar)</span>
           </Link>
         </div>
 
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-              <History className="w-6 h-6" />
+        {/* Terminal Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#0d1319] border border-cyan-500/50 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">
+              <History className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                Discovery Pipeline Audit Logs
+              <h1 className="text-base sm:text-lg font-bold text-cyan-300">
+                // SYSTEM_AUDIT_LOGS: DISCOVERY_RUNS
               </h1>
-              <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Inspect automated runs, new additions, fuzzy duplicates skipped, and expired events archived.
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Inspect cron cycles, new opportunities added, fuzzy deduplications, and archived past events.
               </p>
             </div>
           </div>
@@ -78,25 +79,25 @@ export default function PipelineLogsPage() {
           <button
             onClick={triggerRun}
             disabled={isTriggering}
-            className="self-start sm:self-auto px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+            className="self-start sm:self-auto px-3.5 py-1.5 rounded bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${isTriggering ? 'animate-spin' : ''}`} />
-            <span>{isTriggering ? 'Running Pipeline...' : 'Run Pipeline Now'}</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isTriggering ? 'animate-spin' : ''}`} />
+            <span>{isTriggering ? 'RUNNING_CYCLE...' : 'EXECUTE_CYCLE'}</span>
           </button>
         </div>
 
-        {/* Logs Table / List */}
+        {/* Logs stream */}
         {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center text-zinc-400">
-            <RefreshCw className="w-6 h-6 animate-spin mb-2" />
-            <p className="text-xs">Loading audit trail...</p>
+          <div className="py-20 flex flex-col items-center justify-center text-zinc-500 text-xs">
+            <RefreshCw className="w-5 h-5 animate-spin mb-2 text-cyan-400" />
+            <p>// Reading log stream...</p>
           </div>
         ) : logs.length === 0 ? (
-          <div className="py-16 text-center bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8">
-            <p className="text-sm text-zinc-500">No pipeline runs recorded yet.</p>
+          <div className="py-16 text-center bg-[#090e13] rounded-xl border border-zinc-800 p-8">
+            <p className="text-xs text-zinc-500">// No log records found.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {logs.map(log => {
               const runDate = parseISO(log.timestamp);
               const isSuccess = log.status === 'success';
@@ -104,72 +105,62 @@ export default function PipelineLogsPage() {
               return (
                 <div
                   key={log.id}
-                  className="p-5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-3"
+                  className="p-4 bg-[#090e13] rounded-xl border border-zinc-800 text-xs space-y-3 font-mono"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800/80 pb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-2.5">
                     <div className="flex items-center gap-2">
                       {isSuccess ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
-                          <CheckCircle className="w-3.5 h-3.5" />
-                          Success
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-500/60">
+                          <CheckCircle className="w-3 h-3" />
+                          STATUS: 200 OK
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300">
-                          <XCircle className="w-3.5 h-3.5" />
-                          Failed
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-950/60 text-rose-300 border border-rose-500/60">
+                          <XCircle className="w-3 h-3" />
+                          STATUS: 500 ERR
                         </span>
                       )}
-                      <span className="text-xs font-mono text-zinc-400">ID: {log.id}</span>
+                      <span className="text-zinc-500">RUN_ID: {log.id}</span>
                     </div>
 
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
-                      {format(runDate, 'MMMM d, yyyy • HH:mm:ss')}
+                    <span className="text-zinc-400">
+                      {format(runDate, 'yyyy-MM-dd HH:mm:ss')} UTC
                     </span>
                   </div>
 
-                  {/* Summary Metric Stats */}
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 py-1 text-center">
-                    <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
-                      <div className="text-base sm:text-lg font-bold text-zinc-800 dark:text-zinc-200">
-                        {log.events_scanned}
-                      </div>
-                      <div className="text-[11px] text-zinc-500">Scanned</div>
+                  {/* Metrics */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
+                    <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
+                      <div className="font-bold text-zinc-200">{log.events_scanned}</div>
+                      <div className="text-[10px] text-zinc-500">SCANNED</div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300">
-                      <div className="text-base sm:text-lg font-bold">+{log.events_added}</div>
-                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400">Added</div>
+                    <div className="p-2 rounded bg-emerald-950/30 border border-emerald-500/40 text-emerald-300">
+                      <div className="font-bold">+{log.events_added}</div>
+                      <div className="text-[10px]">ADDED</div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
-                      <div className="text-base sm:text-lg font-bold text-zinc-800 dark:text-zinc-200">
-                        {log.duplicates_skipped}
-                      </div>
-                      <div className="text-[11px] text-zinc-500">Duplicates Skipped</div>
+                    <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
+                      <div className="font-bold text-zinc-200">{log.duplicates_skipped}</div>
+                      <div className="text-[10px] text-zinc-500">FUZZY SKIPPED</div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300">
-                      <div className="text-base sm:text-lg font-bold">{log.low_confidence_count}</div>
-                      <div className="text-[11px] text-amber-600 dark:text-amber-400">Needs Review</div>
+                    <div className="p-2 rounded bg-amber-950/30 border border-amber-500/40 text-amber-300">
+                      <div className="font-bold">{log.low_confidence_count}</div>
+                      <div className="text-[10px]">NEEDS REVIEW</div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
-                      <div className="text-base sm:text-lg font-bold text-zinc-800 dark:text-zinc-200">
-                        {log.events_archived}
-                      </div>
-                      <div className="text-[11px] text-zinc-500">Auto-Archived</div>
+                    <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
+                      <div className="font-bold text-zinc-200">{log.events_archived}</div>
+                      <div className="text-[10px] text-zinc-500">ARCHIVED</div>
                     </div>
                   </div>
 
-                  {/* Details of newly added & skipped */}
+                  {/* Details */}
                   {log.details && (
-                    <div className="pt-2 text-xs space-y-2 border-t border-zinc-100 dark:border-zinc-800/80">
+                    <div className="pt-2 text-[11px] space-y-1.5 border-t border-zinc-800/80 text-zinc-400">
                       {log.details.added_titles && log.details.added_titles.length > 0 && (
                         <div>
-                          <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-                            Newly added events:
-                          </span>
-                          <ul className="list-disc list-inside text-zinc-600 dark:text-zinc-400 mt-1 pl-1 space-y-0.5">
+                          <span className="text-emerald-400 font-bold">&gt; NEW_ENTRIES:</span>
+                          <ul className="list-disc list-inside mt-0.5 text-zinc-300 pl-2 space-y-0.5">
                             {log.details.added_titles.map((t, idx) => (
-                              <li key={idx} className="truncate">
-                                {t}
-                              </li>
+                              <li key={idx} className="truncate">{t}</li>
                             ))}
                           </ul>
                         </div>
@@ -177,14 +168,10 @@ export default function PipelineLogsPage() {
 
                       {log.details.skipped_titles && log.details.skipped_titles.length > 0 && (
                         <div className="pt-1">
-                          <span className="font-semibold text-zinc-500">
-                            Fuzzy duplicates skipped:
-                          </span>
-                          <ul className="list-disc list-inside text-zinc-500 mt-1 pl-1 space-y-0.5">
+                          <span className="text-zinc-500 font-bold">&gt; FUZZY_DUPLICATES_DROPPED:</span>
+                          <ul className="list-disc list-inside mt-0.5 text-zinc-500 pl-2 space-y-0.5">
                             {log.details.skipped_titles.map((t, idx) => (
-                              <li key={idx} className="truncate">
-                                {t}
-                              </li>
+                              <li key={idx} className="truncate">{t}</li>
                             ))}
                           </ul>
                         </div>
@@ -192,14 +179,13 @@ export default function PipelineLogsPage() {
                     </div>
                   )}
 
-                  {/* Errors if any */}
                   {log.errors && log.errors.length > 0 && (
-                    <div className="p-3 bg-rose-50 dark:bg-rose-950/40 rounded-xl text-xs text-rose-800 dark:text-rose-300">
-                      <div className="font-semibold mb-1 flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Errors encountered:</span>
+                    <div className="p-2.5 bg-rose-950/40 border border-rose-500/50 rounded text-rose-300 text-[11px]">
+                      <div className="font-bold mb-0.5 flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>ERRORS:</span>
                       </div>
-                      <ul className="list-disc list-inside space-y-0.5">
+                      <ul className="list-disc list-inside">
                         {log.errors.map((err, idx) => (
                           <li key={idx}>{err}</li>
                         ))}

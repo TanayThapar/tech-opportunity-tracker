@@ -6,6 +6,19 @@ export type DiscoveryConfidence = 'high' | 'low';
 
 export type OpportunityStatus = 'published' | 'needs_review' | 'archived';
 
+export interface EventComment {
+  id: string;
+  author: string;
+  text: string;
+  timestamp: string;
+}
+
+export interface UserEventInteraction {
+  starred?: boolean;
+  participating?: boolean;
+  comments?: EventComment[];
+}
+
 export interface TechOpportunity {
   id: string;
   title: string;
@@ -23,6 +36,9 @@ export interface TechOpportunity {
   status: OpportunityStatus;
   created_at: string;
   updated_at: string;
+  // Local/community interactions
+  starred_count?: number;
+  participants_count?: number;
 }
 
 export interface PipelineRunLog {
