@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
-import { login, signup, getCurrentUser, ADMIN_WHITELIST } from '@/lib/auth';
+import { login, signup, getCurrentUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { Terminal, Shield, User, ArrowRight, Lock, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Terminal, Shield, User, ArrowRight, KeyRound } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function LoginPage() {
@@ -114,7 +114,7 @@ export default function LoginPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. TanayThapar, Sanvi850, or your handle"
+                  placeholder="e.g. TanayThapar, Sanvi850, panchadip, or your handle"
                   value={identifier}
                   onChange={e => setIdentifier(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-[#080c10] border border-zinc-800 rounded text-zinc-200 focus:outline-none focus:border-emerald-500 font-mono"
@@ -165,25 +165,34 @@ export default function LoginPage() {
                 <Shield className="w-3 h-3 text-purple-400" />
                 <span>WHITELISTED_ADMINS:</span>
               </span>
-              <span className="text-purple-400 font-bold">TanayThapar • Sanvi850</span>
+              <span className="text-purple-400 font-bold">TanayThapar • Sanvi850 • panchadip</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
               <button
                 type="button"
                 onClick={() => handleSelectWhitelisted('TanayThapar')}
-                className="py-1.5 px-2 bg-zinc-900 hover:bg-purple-950/40 border border-purple-500/40 text-purple-300 rounded text-xs transition-all text-left flex items-center justify-between"
+                className="py-1.5 px-2 bg-zinc-900 hover:bg-purple-950/40 border border-purple-500/40 text-purple-300 rounded text-xs transition-all text-left flex flex-col justify-between"
               >
-                <span>@TanayThapar</span>
+                <span className="truncate">@TanayThapar</span>
                 <span className="text-[10px] text-zinc-500">Admin &gt;</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSelectWhitelisted('Sanvi850')}
-                className="py-1.5 px-2 bg-zinc-900 hover:bg-purple-950/40 border border-purple-500/40 text-purple-300 rounded text-xs transition-all text-left flex items-center justify-between"
+                className="py-1.5 px-2 bg-zinc-900 hover:bg-purple-950/40 border border-purple-500/40 text-purple-300 rounded text-xs transition-all text-left flex flex-col justify-between"
               >
-                <span>@Sanvi850</span>
+                <span className="truncate">@Sanvi850</span>
+                <span className="text-[10px] text-zinc-500">Admin &gt;</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectWhitelisted('panchadip')}
+                className="py-1.5 px-2 bg-zinc-900 hover:bg-purple-950/40 border border-purple-500/40 text-purple-300 rounded text-xs transition-all text-left flex flex-col justify-between"
+              >
+                <span className="truncate">@panchadip</span>
                 <span className="text-[10px] text-zinc-500">Admin &gt;</span>
               </button>
             </div>

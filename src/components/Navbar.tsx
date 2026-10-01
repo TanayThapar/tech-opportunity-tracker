@@ -117,7 +117,7 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline }: NavbarP
               <Link
                 href="/admin"
                 className="flex items-center space-x-1 px-2 py-1.5 rounded text-zinc-500 hover:text-purple-400 text-[11px]"
-                title="Admin Backend (Whitelisted: TanayThapar, Sanvi850)"
+                title="Admin Backend (Whitelisted: TanayThapar, Sanvi850, panchadip)"
               >
                 <Shield className="w-3 h-3 text-zinc-500" />
                 <span className="hidden lg:inline">/admin</span>

@@ -3,25 +3,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import { TechOpportunity, PipelineRunLog } from '@/types';
-import { getCurrentUser, isWhitelistedAdmin, login, ADMIN_WHITELIST } from '@/lib/auth';
+import { getCurrentUser, isWhitelistedAdmin, login } from '@/lib/auth';
 import { UserProfile } from '@/types/auth';
 import {
-  ShieldAlert,
   BarChart3,
   TrendingUp,
   PieChart,
   Activity,
   Layers,
-  Calendar,
-  Sparkles,
   Lock,
-  ArrowUpRight,
   Database,
   Cpu,
-  CheckCircle,
   ExternalLink,
   ShieldCheck,
-  UserCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
@@ -31,7 +25,6 @@ export default function AdminAnalyticsDashboard() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [opportunities, setOpportunities] = useState<TechOpportunity[]>([]);
   const [logs, setLogs] = useState<PipelineRunLog[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const u = getCurrentUser();
@@ -39,7 +32,6 @@ export default function AdminAnalyticsDashboard() {
 
     const fetchData = async () => {
       try {
-        setLoading(true);
         const [oppsRes, logsRes] = await Promise.all([
           fetch('/api/opportunities?status=published'),
           fetch('/api/pipeline/logs'),
@@ -51,8 +43,6 @@ export default function AdminAnalyticsDashboard() {
         if (logsJson.success) setLogs(logsJson.data);
       } catch (err) {
         console.error('Failed loading admin data:', err);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -122,7 +112,7 @@ export default function AdminAnalyticsDashboard() {
     return { totalScanned, totalAdded, totalSkipped, totalArchived };
   }, [logs]);
 
-  // Strict whitelist check: Only TanayThapar and Sanvi850
+  // Strict whitelist check: TanayThapar, Sanvi850, and panchadip
   const isAuthorized = user && (isWhitelistedAdmin(user.handle) || isWhitelistedAdmin(user.email));
 
   if (!isAuthorized) {
@@ -142,9 +132,10 @@ export default function AdminAnalyticsDashboard() {
               <p>
                 This backend tab is strictly restricted to whitelisted administrators:
               </p>
-              <div className="flex gap-2 text-purple-400 font-bold pt-1">
+              <div className="flex flex-wrap gap-2 text-purple-400 font-bold pt-1">
                 <span>• @TanayThapar</span>
                 <span>• @Sanvi850</span>
+                <span>• @panchadip</span>
               </div>
               {user && (
                 <div className="pt-1.5 text-zinc-500 text-[11px] border-t border-zinc-800/80">
@@ -154,18 +145,24 @@ export default function AdminAnalyticsDashboard() {
             </div>
 
             <div className="pt-2 flex flex-col gap-2">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 <button
                   onClick={() => handleAdminAuthOverride('TanayThapar')}
-                  className="py-2 bg-purple-950 hover:bg-purple-900 border border-purple-500/60 text-purple-300 font-bold text-xs rounded transition-colors"
+                  className="py-2 bg-purple-950 hover:bg-purple-900 border border-purple-500/60 text-purple-300 font-bold text-xs rounded transition-colors truncate px-1"
                 >
-                  LOGIN: @TanayThapar
+                  @TanayThapar
                 </button>
                 <button
                   onClick={() => handleAdminAuthOverride('Sanvi850')}
-                  className="py-2 bg-purple-950 hover:bg-purple-900 border border-purple-500/60 text-purple-300 font-bold text-xs rounded transition-colors"
+                  className="py-2 bg-purple-950 hover:bg-purple-900 border border-purple-500/60 text-purple-300 font-bold text-xs rounded transition-colors truncate px-1"
                 >
-                  LOGIN: @Sanvi850
+                  @Sanvi850
+                </button>
+                <button
+                  onClick={() => handleAdminAuthOverride('panchadip')}
+                  className="py-2 bg-purple-950 hover:bg-purple-900 border border-purple-500/60 text-purple-300 font-bold text-xs rounded transition-colors truncate px-1"
+                >
+                  @panchadip
                 </button>
               </div>
 
@@ -204,7 +201,7 @@ export default function AdminAnalyticsDashboard() {
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Authorized for <strong className="text-emerald-400">TanayThapar</strong> & <strong className="text-emerald-400">Sanvi850</strong>. Real-time pipeline audit & visual metrics.
+                Authorized for <strong className="text-emerald-400">TanayThapar</strong>, <strong className="text-emerald-400">Sanvi850</strong> & <strong className="text-emerald-400">panchadip</strong>. Real-time pipeline audit & visual metrics.
               </p>
             </div>
           </div>
