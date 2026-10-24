@@ -254,8 +254,16 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
                     <div className="text-xs font-semibold text-gray-900 dark:text-white truncate max-w-[120px]">
                       {user.name}
                     </div>
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wider">
-                      [{user.role}]
+                    <div className="text-[10px] uppercase tracking-wider pt-0.5">
+                      {user.role === 'admin' ? (
+                        <span className="px-1.5 py-0.5 rounded bg-purple-950 border border-purple-500/60 text-purple-300 font-bold text-[9px]">
+                          ADMIN
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-500/60 text-emerald-300 font-bold text-[9px]">
+                          ALPHA TESTER
+                        </span>
+                      )}
                     </div>
                   </div>
                   <button

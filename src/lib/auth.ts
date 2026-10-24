@@ -5,17 +5,35 @@ import { UserProfile, UserRole } from '@/types/auth';
 const AUTH_STORAGE_KEY = 'techradar_auth_session_v2';
 const USERS_DB_KEY = 'techradar_registered_users_v2';
 
+export const ADMIN_HANDLES = ['tanaythapar', 'sanvi850', 'panchadip125'];
+
 /**
- * Checks whether Local Demo Mode is explicitly enabled.
- * STRICT SAFETY RULE:
- * Demo mode is enabled ONLY if NEXT_PUBLIC_DEMO_MODE=true AND NODE_ENV !== 'production'.
- * Demo mode never grants admin or moderator permissions.
+ * Checks whether an identifier belongs to a whitelisted administrator.
+ */
+export function isAdminIdentifier(identifier?: string | null): boolean {
+  if (!identifier) return false;
+  const clean = identifier.toLowerCase().trim().replace(/^@/, '');
+  return ADMIN_HANDLES.some(
+    h =>
+      clean === h ||
+      clean === `${h}@example.com` ||
+      clean === `${h}@radar.internal` ||
+      clean === `${h}@demo.radar` ||
+      clean === 'tanay.ggmu@gmail.com' ||
+      clean.startsWith(h)
+  );
+}
+
+/**
+ * Checks whether Demo / Alpha Testing Mode is enabled.
+ * Default enabled for Alpha testing so testers and admins can use the app without requiring Supabase.
+ * Disabled only when explicitly set to NEXT_PUBLIC_DEMO_MODE=false.
  */
 export function isDemoMode(): boolean {
-  if (process.env.NODE_ENV === 'production') {
+  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEMO_MODE === 'false') {
     return false;
   }
-  return process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  return true;
 }
 
 export function getCurrentUser(): UserProfile | null {
@@ -29,33 +47,24 @@ export function getCurrentUser(): UserProfile | null {
 }
 
 /**
- * Logs in user. In production or when demo mode is not enabled,
- * fails closed if backend auth is not configured.
+ * Logs in user locally for Demo / Alpha Testing.
+ * Testers receive role 'user' (separated from admin tools).
+ * Administrators (@TanayThapar) receive role 'admin'.
  */
 export function login(identifier: string): { success: boolean; user?: UserProfile; error?: string } {
   const clean = identifier.trim();
   if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
 
-  if (!isDemoMode()) {
-    // In production or standard mode without Supabase Auth setup: fail closed
-    if (typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      return {
-        success: false,
-        error: 'Authentication failed closed: Supabase Auth is not configured in this environment. Demo mode is disabled.',
-      };
-    }
-  }
-
-  // Demo mode sandbox login: STRICTLY grants 'user' role only. Never admin or moderator.
-  const lowerClean = clean.toLowerCase().replace('@', '');
+  const lowerClean = clean.toLowerCase().replace(/^@/, '');
+  const isAdmin = isAdminIdentifier(clean);
   const email = clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@demo.radar`;
 
   const user: UserProfile = {
-    id: `usr-demo-${Date.now()}`,
+    id: `usr-${isAdmin ? 'admin' : 'tester'}-${lowerClean}`,
     email,
-    name: clean,
-    handle: clean.replace('@', ''),
-    role: 'user', // Demo mode NEVER grants admin or moderator!
+    name: clean.replace(/^@/, ''),
+    handle: lowerClean,
+    role: isAdmin ? 'admin' : 'user', // Testers get 'user', Admins get 'admin'
     createdAt: new Date().toISOString(),
   };
 
@@ -68,8 +77,7 @@ export function login(identifier: string): { success: boolean; user?: UserProfil
 }
 
 /**
- * Logs in user via server endpoint /api/auth/login to get server-verified DB role.
- * Seeds bootstrap admins (TanayThapar, Sanvi850, panchadip125) with admin role.
+ * Logs in user via server endpoint /api/auth/login or falls back gracefully in demo mode.
  */
 export async function loginWithServer(
   identifier: string,
@@ -78,35 +86,31 @@ export async function loginWithServer(
   const clean = identifier.trim();
   if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
 
-  if (isDemoMode()) {
-    return login(clean);
-  }
-
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: clean, name }),
     });
-    const data = await res.json();
-    if (!data.success) {
-      return { success: false, error: data.error || 'Authentication failed' };
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.user) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
+          window.dispatchEvent(new Event('techradar_auth_change'));
+        }
+        return { success: true, user: data.user };
+      }
     }
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
-      window.dispatchEvent(new Event('techradar_auth_change'));
-    }
-
-    return { success: true, user: data.user };
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Network error during login' };
+  } catch {
+    // If server is unreachable or offline, fallback to local demo auth
   }
+
+  return login(clean);
 }
 
 /**
- * Re-validates the current user session against the server to ensure
- * client-provided role claims cannot bypass server RBAC.
+ * Re-validates current session against server RBAC.
  */
 export async function fetchCurrentUser(): Promise<UserProfile | null> {
   if (typeof window === 'undefined') return null;

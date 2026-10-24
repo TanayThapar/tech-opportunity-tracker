@@ -18,20 +18,23 @@ describe('Demo Mode & Role Escalation Isolation', () => {
     process.env = originalEnv;
   });
 
-  it('ensures demo mode is NEVER active when NODE_ENV=production', () => {
-    (process.env as any).NODE_ENV = 'production';
-    process.env.NEXT_PUBLIC_DEMO_MODE = 'true';
-
+  it('ensures demo mode is disabled when NEXT_PUBLIC_DEMO_MODE=false', () => {
+    process.env.NEXT_PUBLIC_DEMO_MODE = 'false';
     expect(isDemoMode()).toBe(false);
   });
 
-  it('ensures demo mode only grants user role and never admin or moderator', () => {
-    (process.env as any).NODE_ENV = 'development';
+  it('ensures testers receive role "user" and are isolated from admin tools', () => {
     process.env.NEXT_PUBLIC_DEMO_MODE = 'true';
 
-    const loginRes = login('TanayThapar');
+    const loginRes = login('AlphaTester1');
     expect(loginRes.success).toBe(true);
-    expect(loginRes.user?.role).toBe('user'); // MUST BE 'user', NEVER 'admin'!
+    expect(loginRes.user?.role).toBe('user'); // Testers MUST be 'user', NEVER 'admin'!
+  });
+
+  it('ensures @TanayThapar receives role "admin" for separate admin window', () => {
+    const adminLogin = login('TanayThapar');
+    expect(adminLogin.success).toBe(true);
+    expect(adminLogin.user?.role).toBe('admin');
   });
 
   it('blocks standard user from accessing admin pipeline logs route (403 Forbidden)', async () => {

@@ -154,16 +154,16 @@ export default function AdminAnalyticsDashboard() {
               <Lock className="w-6 h-6" />
             </div>
             <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-              ACCESS_RESTRICTION // 403 FORBIDDEN
+              ADMIN WINDOW // SEPARATED FROM TESTERS
             </h2>
             <div className="p-3 bg-zinc-950 rounded border border-zinc-800 text-xs text-zinc-400 text-left space-y-1">
-              <div className="text-zinc-500 font-bold uppercase text-[10px]">ROLE-BASED AUTHORIZATION:</div>
+              <div className="text-amber-400 font-bold uppercase text-[10px]">ROLE SEPARATION ACTIVE:</div>
               <p>
-                This administration dashboard requires a server-verified <strong>admin</strong> role in the profiles table.
+                The administrative dashboard and crawler controls are isolated from tester views. Testers have access to the public discovery radar and personal calendar.
               </p>
               {user && (
                 <div className="pt-1.5 text-zinc-500 text-[11px] border-t border-zinc-800/80">
-                  Current user: <span className="text-zinc-300">@{user.handle}</span> (Role: <span className="text-amber-400">{user.role}</span>)
+                  Current session: <span className="text-emerald-400 font-bold">@{user.handle}</span> (Role: <span className="text-amber-400 font-bold">{user.role === 'user' ? 'Alpha Tester' : user.role}</span>)
                 </div>
               )}
             </div>
