@@ -9,11 +9,12 @@ import SubmitOpportunityModal from '@/components/SubmitOpportunityModal';
 import { TechOpportunity, OpportunityType, OpportunityFormat } from '@/types';
 import {
   Calendar, LayoutList, AlertCircle, Compass,
-  Star, UserCheck, PlusCircle, Terminal
+  Star, UserCheck, PlusCircle, Terminal, RefreshCw
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { getAllInteractions } from '@/lib/interactions';
+import { format } from 'date-fns';
 
 export default function HomePage() {
   const [opportunities, setOpportunities] = useState<TechOpportunity[]>([]);
@@ -31,26 +32,37 @@ export default function HomePage() {
   const [interactionVersion, setInteractionVersion] = useState(0);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
 
-  const fetchOpportunities = async () => {
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+
+  const fetchOpportunities = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       const res = await fetch('/api/opportunities?status=published');
       const json = await res.json();
       if (json.success) {
         setOpportunities(json.data);
+        setLastRefreshedAt(new Date());
       }
     } catch (err) {
       console.error('Failed to fetch opportunities:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchOpportunities();
+    // Auto-refresh upcoming opportunities every 60 seconds
+    const interval = setInterval(() => {
+      fetchOpportunities(true);
+    }, 60000);
+
     const handleInteractionChange = () => setInteractionVersion(v => v + 1);
     window.addEventListener('techradar_interaction_change', handleInteractionChange);
-    return () => window.removeEventListener('techradar_interaction_change', handleInteractionChange);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('techradar_interaction_change', handleInteractionChange);
+    };
   }, []);
 
   const handleTriggerPipeline = async () => {
@@ -162,20 +174,42 @@ export default function HomePage() {
         {/* Page header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
-              <Calendar className="w-6 h-6 text-blue-600" />
-              Tech Opportunity Tracker
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
+                <Calendar className="w-6 h-6 text-blue-600" />
+                <span>Tech Opportunity Tracker</span>
+              </h1>
+              <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-600 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>LIVE SYNC</span>
+              </div>
+            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              {opportunities.length} live events indexed · Conferences, Hackathons, Workshops & Internships
+              {opportunities.length} live opportunities · Hackathons, Conferences, Jobs, Workshops & Internships
+              {lastRefreshedAt && (
+                <span className="text-gray-400 dark:text-gray-500">
+                  {' '}· Updated {format(lastRefreshedAt, 'h:mm a')}
+                </span>
+              )}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Refresh Opportunities */}
+            <button
+              onClick={() => fetchOpportunities(false)}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              title="Refresh upcoming opportunities feed"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-blue-500 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+
             {/* Add Event */}
             <button
               onClick={() => setIsSubmitModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-sm cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               Add Event

@@ -32,6 +32,8 @@ import {
   X,
   Bookmark,
   AlertTriangle,
+  RefreshCw,
+  Search,
 } from 'lucide-react';
 import { TypeBadge, TierBadge, CATEGORY_COLORS } from './Badge';
 import { getInteraction, toggleStar, toggleParticipating, toggleReminder } from '@/lib/interactions';
@@ -63,6 +65,15 @@ function getDaysUntil(dateStr: string): number {
   } catch { return 999; }
 }
 
+function safeFormatDate(dateStr?: string | null, formatStr: string = 'MMM d, yyyy'): string {
+  if (!dateStr) return 'No deadline listed';
+  try {
+    return format(parseISO(dateStr), formatStr);
+  } catch {
+    return dateStr;
+  }
+}
+
 function UrgencyBadge({ daysUntil, label }: { daysUntil: number; label: string }) {
   if (daysUntil < 0) return null;
   const color = daysUntil <= 1 ? 'bg-red-500 text-white animate-pulse' : daysUntil <= 7 ? 'bg-orange-500 text-white' : 'bg-yellow-600/80 text-white';
@@ -82,6 +93,11 @@ export default function CalendarView({ opportunities, onRefresh }: CalendarViewP
   const [showContributorModal, setShowContributorModal] = useState(false);
   const [selectedDayDate, setSelectedDayDate] = useState<Date | null>(null);
 
+  // Directory filter & sort state
+  const [directoryCategory, setDirectoryCategory] = useState<string>('all');
+  const [directorySearch, setDirectorySearch] = useState<string>('');
+  const [directorySort, setDirectorySort] = useState<'date' | 'deadline' | 'title'>('date');
+
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
   const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
@@ -93,8 +109,8 @@ export default function CalendarView({ opportunities, onRefresh }: CalendarViewP
   /**
    * Returns events for a given day:
    * - conferences/hackathons/workshops: span start_date → end_date
-   * - internships: only show on start_date (single box)
-   * - conferences with submission_deadline: also show a "CFP DEADLINE" marker on that day
+   * - internships & jobs: show on start_date
+   * - submission or application deadlines: also show a "CFP/App Deadline" marker on that day
    */
   const getDayEvents = (day: Date): { event: TechOpportunity; isDeadline?: boolean; isStart?: boolean }[] => {
     const dayStr = format(day, 'yyyy-MM-dd');
@@ -102,24 +118,27 @@ export default function CalendarView({ opportunities, onRefresh }: CalendarViewP
 
     for (const event of opportunities) {
       try {
-        const startStr = event.start_date.split('T')[0];
-        const endStr = event.end_date.split('T')[0];
+        const startStr = (event.start_date || '').split('T')[0];
+        const endStr = (event.end_date || event.start_date || '').split('T')[0];
 
-        if (event.type === 'internship') {
-          // Internships: only on their start_date
+        if (!startStr) continue;
+
+        if (event.type === 'internship' || event.type === 'job') {
+          // Internships & Jobs: show on their start/posted date
           if (dayStr === startStr) {
             results.push({ event, isStart: true });
           }
         } else {
-          // Non-internships: show across span
+          // Conferences, Hackathons, Workshops: show across span
           if (dayStr >= startStr && dayStr <= endStr) {
             results.push({ event, isStart: dayStr === startStr });
           }
         }
 
-        // Submission deadline marker for conferences
-        if (event.type === 'conference' && event.submission_deadline) {
-          const dlStr = event.submission_deadline.split('T')[0];
+        // Submission or Application deadline marker
+        const deadline = event.submission_deadline || event.application_deadline;
+        if (deadline) {
+          const dlStr = deadline.split('T')[0];
           if (dayStr === dlStr) {
             results.push({ event, isDeadline: true });
           }
@@ -133,11 +152,45 @@ export default function CalendarView({ opportunities, onRefresh }: CalendarViewP
     const mStart = format(monthStart, 'yyyy-MM-dd');
     const mEnd = format(monthEnd, 'yyyy-MM-dd');
     return opportunities.filter(event => {
-      const s = event.start_date.split('T')[0];
-      const e = event.end_date.split('T')[0];
-      return s <= mEnd && e >= mStart;
+      try {
+        const s = (event.start_date || '').split('T')[0];
+        const e = (event.end_date || event.start_date || '').split('T')[0];
+        return s <= mEnd && e >= mStart;
+      } catch {
+        return false;
+      }
     });
   }, [opportunities, monthStart, monthEnd]);
+
+  // Filtered list for the Upcoming Directory
+  const filteredDirectoryList = useMemo(() => {
+    return opportunities
+      .filter(item => {
+        if (directoryCategory !== 'all' && item.type !== directoryCategory) return false;
+        if (directorySearch.trim()) {
+          const q = directorySearch.toLowerCase();
+          const titleMatch = item.title.toLowerCase().includes(q);
+          const orgMatch = item.organizer.toLowerCase().includes(q);
+          const compMatch = (item.company || '').toLowerCase().includes(q);
+          const tierMatch = (item.conference_tier || '').toLowerCase().includes(q);
+          if (!titleMatch && !orgMatch && !compMatch && !tierMatch) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (directorySort === 'title') {
+          return a.title.localeCompare(b.title);
+        }
+        if (directorySort === 'deadline') {
+          const dlA = a.submission_deadline || a.application_deadline || '9999-99-99';
+          const dlB = b.submission_deadline || b.application_deadline || '9999-99-99';
+          return dlA.localeCompare(dlB);
+        }
+        const dateA = a.start_date || '9999-99-99';
+        const dateB = b.start_date || '9999-99-99';
+        return dateA.localeCompare(dateB);
+      });
+  }, [opportunities, directoryCategory, directorySearch, directorySort]);
 
   const handleEventClick = (event: TechOpportunity, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -174,6 +227,15 @@ export default function CalendarView({ opportunities, onRefresh }: CalendarViewP
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             {format(currentMonth, 'MMMM yyyy')}
           </h2>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              title="Refresh calendar opportunities"
+              className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-blue-600 transition-colors cursor-pointer ml-1"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Legend */}
@@ -311,20 +373,237 @@ export default function CalendarView({ opportunities, onRefresh }: CalendarViewP
                     {evt.title}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    {evt.type === 'internship' ? '📌 Opens: ' : ''}{format(parseISO(evt.start_date), 'MMM d')}
-                    {evt.type !== 'internship' && ` → ${format(parseISO(evt.end_date), 'MMM d')}`}
+                    {evt.type === 'internship' ? '📌 Opens: ' : evt.type === 'job' ? '💼 Posted: ' : ''}{safeFormatDate(evt.start_date, 'MMM d')}
+                    {evt.type !== 'internship' && evt.type !== 'job' && evt.end_date && ` → ${safeFormatDate(evt.end_date, 'MMM d')}`}
                   </p>
-                  {daysToStart >= 0 && daysToStart <= 14 && evt.type !== 'internship' && (
+                  {daysToStart >= 0 && daysToStart <= 14 && evt.type !== 'internship' && evt.type !== 'job' && (
                     <UrgencyBadge daysUntil={daysToStart} label="Starts" />
                   )}
                   {daysToDeadline !== null && daysToDeadline >= 0 && daysToDeadline <= 14 && (
-                    <UrgencyBadge daysUntil={daysToDeadline} label="CFP Due" />
+                    <UrgencyBadge daysUntil={daysToDeadline} label="Deadline" />
                   )}
                 </button>
               );
             })}
           </div>
         )}
+      </div>
+
+      {/* ── Upcoming Opportunities Directory by Category & Respective Dates ─── */}
+      <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100 dark:border-gray-800">
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-blue-600" />
+              <span>Upcoming Opportunities Directory ({filteredDirectoryList.length})</span>
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Comprehensive list of Hackathons, Conferences, Jobs, Workshops, and Internships with respective event and deadline dates.
+            </p>
+          </div>
+
+          {/* Quick Refresh Button in Directory */}
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-blue-500" />
+              <span>Refresh Listings</span>
+            </button>
+          )}
+        </div>
+
+        {/* Category Filter Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {([
+            { id: 'all', label: 'All Opportunities', count: opportunities.length },
+            { id: 'conference', label: 'Conferences', count: opportunities.filter(o => o.type === 'conference').length },
+            { id: 'hackathon', label: 'Hackathons', count: opportunities.filter(o => o.type === 'hackathon').length },
+            { id: 'job', label: 'Jobs', count: opportunities.filter(o => o.type === 'job').length },
+            { id: 'workshop', label: 'Workshops', count: opportunities.filter(o => o.type === 'workshop').length },
+            { id: 'internship', label: 'Internships', count: opportunities.filter(o => o.type === 'internship').length },
+          ] as const).map(tab => {
+            const isSelected = directoryCategory === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setDirectoryCategory(tab.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-blue-700 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search & Sort within directory */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+          <div className="relative w-full sm:w-72">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search category, title, or employer..."
+              value={directorySearch}
+              onChange={e => setDirectorySearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto text-xs text-gray-500">
+            <span>Sort by:</span>
+            <select
+              value={directorySort}
+              onChange={e => setDirectorySort(e.target.value as any)}
+              className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1 text-xs text-gray-700 dark:text-gray-200 focus:outline-none cursor-pointer"
+            >
+              <option value="date">Event Start Date</option>
+              <option value="deadline">Application / CFP Deadline</option>
+              <option value="title">Title (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* List of Opportunities with Respective Dates */}
+        <div className="divide-y divide-gray-100 dark:divide-gray-800/80 border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden bg-white dark:bg-gray-900 shadow-sm">
+          {filteredDirectoryList.length === 0 ? (
+            <div className="p-8 text-center text-xs text-gray-400">
+              No matching opportunities in this category.
+            </div>
+          ) : (
+            filteredDirectoryList.map(item => {
+              const interaction = getInteraction(item.id);
+              const hasEndDate = item.end_date && item.end_date.trim().length > 0;
+              const deadline = item.submission_deadline || item.application_deadline;
+              const daysToStart = getDaysUntil(item.start_date);
+              const daysToDeadline = deadline ? getDaysUntil(deadline) : null;
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => setSelectedEvent(item)}
+                  className="p-3.5 sm:p-4 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer group"
+                >
+                  {/* Left: Badges + Title + Details */}
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <TypeBadge type={item.type} />
+                      {item.type === 'conference' && item.conference_tier && (
+                        <TierBadge tier={item.conference_tier} />
+                      )}
+                      {(item.company || (item.type === 'job' && item.organizer)) && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          {item.company || item.organizer}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+                        [{item.format}]
+                      </span>
+                    </div>
+
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {item.title}
+                    </h4>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                      <span>Org: {item.organizer}</span>
+                      {item.location && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-gray-400" />
+                          <span>{item.location}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Respective Dates + Deadlines + Actions */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100 dark:border-gray-800">
+                    <div className="text-left sm:text-right space-y-1 shrink-0">
+                      {/* Event Duration Dates */}
+                      <div className="text-xs font-semibold text-gray-900 dark:text-gray-200 flex sm:justify-end items-center gap-1.5">
+                        <CalendarDays className="w-3.5 h-3.5 text-blue-500" />
+                        <span>
+                          {item.type === 'internship' ? 'Opens: ' : item.type === 'job' ? 'Posted: ' : 'Dates: '}
+                          {safeFormatDate(item.start_date, 'MMM d, yyyy')}
+                          {hasEndDate && item.type !== 'internship' && item.type !== 'job' && (
+                            <> → {safeFormatDate(item.end_date, 'MMM d, yyyy')}</>
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Application / CFP Deadline */}
+                      <div className="text-[11px] text-gray-500 dark:text-gray-400 flex sm:justify-end items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-orange-500" />
+                        <span>
+                          {item.type === 'conference' ? 'CFP Due: ' : 'Application Deadline: '}
+                          <strong className="text-gray-700 dark:text-gray-300">
+                            {deadline ? safeFormatDate(deadline, 'MMM d, yyyy') : 'No deadline listed (Rolling)'}
+                          </strong>
+                        </span>
+                      </div>
+
+                      {/* Urgency indicators */}
+                      <div className="flex sm:justify-end gap-1.5 pt-0.5">
+                        {daysToStart >= 0 && daysToStart <= 14 && (
+                          <UrgencyBadge daysUntil={daysToStart} label="Starts" />
+                        )}
+                        {daysToDeadline !== null && daysToDeadline >= 0 && daysToDeadline <= 14 && (
+                          <UrgencyBadge daysUntil={daysToDeadline} label="Deadline" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action buttons: Star, Attending, Source Link */}
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => { toggleStar(item.id); refreshInteractions(); }}
+                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                          interaction.starred
+                            ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-600 text-amber-500'
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-amber-500'
+                        }`}
+                        title={interaction.starred ? 'Starred' : 'Star this event'}
+                      >
+                        <Star className={`w-3.5 h-3.5 ${interaction.starred ? 'fill-amber-500' : ''}`} />
+                      </button>
+
+                      <button
+                        onClick={() => { toggleParticipating(item.id); refreshInteractions(); }}
+                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                          interaction.participating
+                            ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-600 text-blue-600'
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 hover:text-blue-500'
+                        }`}
+                        title={interaction.participating ? 'Marked Attending' : 'Mark as Attending'}
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                      </button>
+
+                      {item.source_url && (
+                        <a
+                          href={item.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-blue-600 hover:border-blue-400 transition-colors"
+                          title="Open official organizer source page"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* ── Event Detail Popover / Side Panel ──────────────────────────────── */}

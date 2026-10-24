@@ -96,7 +96,12 @@ export async function getOpportunities(filter?: {
     if (fs.existsSync(EVENTS_FILE)) {
       try {
         const raw = fs.readFileSync(EVENTS_FILE, 'utf-8');
-        memoryOpportunities = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryOpportunities = parsed;
+        } else {
+          memoryOpportunities = [...SEED_OPPORTUNITIES];
+        }
       } catch {
         memoryOpportunities = [...SEED_OPPORTUNITIES];
       }
