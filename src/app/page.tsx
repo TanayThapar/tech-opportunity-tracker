@@ -22,6 +22,7 @@ export default function HomePage() {
   const [selectedType, setSelectedType] = useState<OpportunityType | 'all'>('all');
   const [selectedTier, setSelectedTier] = useState<string | 'all'>('all');
   const [selectedFormat, setSelectedFormat] = useState<OpportunityFormat | 'all'>('all');
+  const [selectedCompany, setSelectedCompany] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyStarred, setOnlyStarred] = useState(false);
   const [onlyAttending, setOnlyAttending] = useState(false);
@@ -95,12 +96,25 @@ export default function HomePage() {
     return Array.from(set);
   }, [opportunities]);
 
+  const companyList = useMemo(() => {
+    const set = new Set<string>();
+    opportunities.forEach(o => {
+      const comp = o.company || (o.type === 'job' ? o.organizer : null);
+      if (comp) set.add(comp);
+    });
+    return Array.from(set).sort();
+  }, [opportunities]);
+
   const filtered = useMemo(() => {
     const interactions = getAllInteractions();
     return opportunities.filter(item => {
       if (selectedType !== 'all' && item.type !== selectedType) return false;
       if (selectedTier !== 'all' && item.conference_tier !== selectedTier) return false;
       if (selectedFormat !== 'all' && item.format !== selectedFormat) return false;
+      if (selectedCompany !== 'all') {
+        const itemCompany = item.company || (item.type === 'job' ? item.organizer : null);
+        if (itemCompany !== selectedCompany) return false;
+      }
       const userInt = interactions[item.id];
       if (onlyStarred && !userInt?.starred) return false;
       if (onlyAttending && !userInt?.participating) return false;
@@ -108,13 +122,14 @@ export default function HomePage() {
         const q = searchQuery.toLowerCase();
         const matchesTitle = item.title.toLowerCase().includes(q);
         const matchesOrg = item.organizer.toLowerCase().includes(q);
+        const matchesCompany = (item.company || '').toLowerCase().includes(q);
         const matchesDesc = item.description.toLowerCase().includes(q);
         const matchesTier = item.conference_tier?.toLowerCase().includes(q);
-        if (!matchesTitle && !matchesOrg && !matchesDesc && !matchesTier) return false;
+        if (!matchesTitle && !matchesOrg && !matchesCompany && !matchesDesc && !matchesTier) return false;
       }
       return true;
     });
-  }, [opportunities, selectedType, selectedTier, selectedFormat, searchQuery, onlyStarred, onlyAttending, interactionVersion]);
+  }, [opportunities, selectedType, selectedTier, selectedFormat, selectedCompany, searchQuery, onlyStarred, onlyAttending, interactionVersion]);
 
   const lowConfidenceCount = useMemo(
     () => opportunities.filter(o => o.discovery_confidence === 'low').length,
@@ -238,9 +253,12 @@ export default function HomePage() {
           onSelectTier={setSelectedTier}
           selectedFormat={selectedFormat}
           onSelectFormat={setSelectedFormat}
+          selectedCompany={selectedCompany}
+          onSelectCompany={setSelectedCompany}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           tierList={tierList}
+          companyList={companyList}
         />
 
         {/* Content */}

@@ -122,8 +122,8 @@ export default function SubmitOpportunityModal({
                 <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
                   <Send className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">Event Published!</p>
-                <p className="text-xs text-gray-400">Adding to calendar...</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Submission Queued for Review!</p>
+                <p className="text-xs text-gray-400">Moderators will review before public publishing.</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -157,6 +157,7 @@ export default function SubmitOpportunityModal({
                     >
                       <option value="hackathon">⚡ Hackathon</option>
                       <option value="conference">🎓 Conference</option>
+                      <option value="job">💼 Regular Job</option>
                       <option value="workshop">🔧 Workshop</option>
                       <option value="internship">📌 Internship</option>
                     </select>

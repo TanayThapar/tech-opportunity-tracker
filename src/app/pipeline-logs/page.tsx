@@ -16,7 +16,12 @@ export default function PipelineLogsPage() {
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/pipeline/logs');
+      const user = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('techradar_auth_session_v2') || 'null') : null;
+      const headers: Record<string, string> = {};
+      if (user?.email) headers['x-user-email'] = user.email;
+      if (user?.id) headers['x-user-id'] = user.id;
+
+      const res = await fetch('/api/pipeline/logs', { headers });
       const json = await res.json();
       if (json.success) {
         setLogs(json.data);
@@ -35,7 +40,12 @@ export default function PipelineLogsPage() {
   const triggerRun = async () => {
     try {
       setIsTriggering(true);
-      const res = await fetch('/api/pipeline/run', { method: 'POST' });
+      const user = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('techradar_auth_session_v2') || 'null') : null;
+      const headers: Record<string, string> = {};
+      if (user?.email) headers['x-user-email'] = user.email;
+      if (user?.id) headers['x-user-id'] = user.id;
+
+      const res = await fetch('/api/pipeline/run', { method: 'POST', headers });
       await res.json();
       await fetchLogs();
     } catch (err) {

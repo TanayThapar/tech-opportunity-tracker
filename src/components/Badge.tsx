@@ -41,6 +41,14 @@ export const CATEGORY_COLORS: Record<OpportunityType, {
     pillClass: 'bg-amber-500/10 border-amber-500/50 text-amber-300 hover:bg-amber-500/20',
     label: '[internship]',
   },
+  job: {
+    border: 'border-blue-500/50',
+    bg: 'bg-blue-950/40',
+    text: 'text-blue-300',
+    glow: 'shadow-blue-500/20',
+    pillClass: 'bg-blue-500/10 border-blue-500/50 text-blue-300 hover:bg-blue-500/20',
+    label: '[job]',
+  },
 };
 
 export function TypeBadge({ type }: { type: OpportunityType }) {
@@ -97,7 +105,7 @@ export function ConfidenceBadge({ confidence }: { confidence: DiscoveryConfidenc
   return (
     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-950/40 text-emerald-300 border border-emerald-500/50">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-      CONFIRMED
+      HIGH_CONFIDENCE
     </span>
   );
 }

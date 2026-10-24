@@ -1,38 +1,40 @@
 import { NextResponse } from 'next/server';
-import { getOpportunities, saveOpportunities } from '@/lib/store';
-import { TechOpportunity } from '@/types';
+import {
+  getOpportunities,
+  addOpportunity,
+  updateOpportunity,
+} from '@/lib/store';
+import { TechOpportunity, OpportunityType } from '@/types';
 import { evaluateDuplicate } from '@/lib/fuzzy';
+import { checkUrlLiveness } from '@/lib/safeFetch';
+import { getAuthenticatedUser, requireRole } from '@/lib/serverAuth';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    const tier = searchParams.get('tier');
-    const confidence = searchParams.get('confidence');
-    const status = searchParams.get('status');
+    const type = searchParams.get('type') || undefined;
+    const tier = searchParams.get('tier') || undefined;
+    const company = searchParams.get('company') || undefined;
+    const requestedStatus = searchParams.get('status') || 'published';
 
-    let events = getOpportunities();
-
-    if (status) {
-      events = events.filter(e => e.status === status);
-    } else {
-      events = events.filter(e => e.status === 'published');
+    // Problem 2: Only published items are public.
+    // Querying needs_review or archived requires server-verified moderator or admin role.
+    if (requestedStatus !== 'published') {
+      const user = await getAuthenticatedUser(request);
+      if (!user || (user.role !== 'moderator' && user.role !== 'admin')) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden: Viewing unpublished items requires moderator or admin role' },
+          { status: 403 }
+        );
+      }
     }
 
-    if (type && type !== 'all') {
-      events = events.filter(e => e.type === type);
-    }
-
-    if (tier && tier !== 'all') {
-      events = events.filter(e => e.conference_tier === tier);
-    }
-
-    if (confidence && confidence !== 'all') {
-      events = events.filter(e => e.discovery_confidence === confidence);
-    }
-
-    // Sort by start_date ascending
-    events.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+    const events = await getOpportunities({
+      status: requestedStatus,
+      type,
+      tier,
+      company,
+    });
 
     return NextResponse.json({ success: true, count: events.length, data: events });
   } catch (error: any) {
@@ -41,7 +43,11 @@ export async function GET(request: Request) {
 }
 
 /**
- * Allows live authenticated users to submit real tech opportunities
+ * User opportunity submission.
+ * Rules:
+ * - Always created as status: 'needs_review' with origin: 'user_submitted'.
+ * - SSRF safe check on source URL.
+ * - Cannot auto-publish.
  */
 export async function POST(request: Request) {
   try {
@@ -51,9 +57,11 @@ export async function POST(request: Request) {
       type,
       conference_tier,
       organizer,
+      company,
       start_date,
       end_date,
       submission_deadline,
+      application_deadline,
       format,
       location,
       source_url,
@@ -62,29 +70,36 @@ export async function POST(request: Request) {
       contributors,
     } = body;
 
-    if (!title || !type || !organizer || !start_date || !end_date || !source_url) {
+    if (!title || !type || (!organizer && !company) || !source_url) {
       return NextResponse.json(
-        { success: false, error: 'Missing mandatory fields: title, type, organizer, start_date, end_date, source_url' },
+        { success: false, error: 'Missing mandatory fields: title, type, organizer/company, source_url' },
         { status: 400 }
       );
     }
 
-    // Mandatory URL validation
-    try {
-      new URL(source_url);
-    } catch {
+    // SSRF safe liveness probe
+    const liveness = await checkUrlLiveness(source_url);
+    if (!liveness.ok) {
       return NextResponse.json(
-        { success: false, error: 'Invalid source URL. A real, valid web link is required.' },
+        { success: false, error: `Invalid or unreachable source URL (${liveness.error || 'Connection failed'}). Must be a live, public URL.` },
         { status: 400 }
       );
     }
 
-    const events = getOpportunities();
+    const orgName = (company || organizer).trim();
+    const startDate = start_date || new Date().toISOString().slice(0, 10);
+    const endDate = end_date || application_deadline || new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10);
 
-    // Check duplicate
+    const allExisting = await getOpportunities();
     const dupCheck = evaluateDuplicate(
-      { title, organizer, start_date, source_url },
-      events.map(e => ({ title: e.title, organizer: e.organizer, start_date: e.start_date, source_url: e.source_url }))
+      { title, organizer: orgName, start_date: startDate, source_url },
+      allExisting.map(e => ({
+        id: e.id,
+        title: e.title,
+        organizer: e.organizer,
+        start_date: e.start_date,
+        source_url: e.source_url,
+      }))
     );
 
     if (dupCheck.isDuplicate) {
@@ -94,65 +109,101 @@ export async function POST(request: Request) {
       );
     }
 
-    const confidence = dupCheck.isAmbiguousNearDuplicate ? 'low' : 'high';
-    const confidence_reasons = dupCheck.isAmbiguousNearDuplicate
-      ? ['Submitted opportunity is a near-match to an existing event. Flagged for review.']
-      : ['Live user submission with verified source URL'];
-
     const newOpp: TechOpportunity = {
-      id: `opp-live-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: `opp-user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       title: title.trim(),
-      type,
+      type: type as OpportunityType,
       conference_tier: conference_tier || null,
-      organizer: organizer.trim(),
-      start_date,
-      end_date,
+      organizer: orgName,
+      company: type === 'job' ? orgName : undefined,
+      start_date: startDate,
+      end_date: endDate,
       submission_deadline: submission_deadline || null,
+      application_deadline: application_deadline || null,
       format: format || 'online',
       location: location?.trim() || null,
       source_url: source_url.trim(),
-      description: description?.trim() || 'Community-submitted live opportunity.',
-      discovery_confidence: confidence,
-      confidence_reasons,
-      status: 'published',
+      description: description?.trim() || 'Community-submitted opportunity pending moderator review.',
+      discovery_confidence: 'low',
+      confidence_reasons: [
+        'User submission, pending moderator review',
+        'source URL reachable at fetch time',
+      ],
+      status: 'needs_review', // ALWAYS needs_review
+      origin: 'user_submitted',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      submitted_by: submitted_by || 'live_user',
+      submitted_by: submitted_by || 'community_user',
       contributors: contributors || [],
+      link_status: 'ok',
+      listing_status: 'open',
+      last_checked_at: new Date().toISOString(),
     };
 
-    events.push(newOpp);
-    saveOpportunities(events);
-
-    return NextResponse.json({ success: true, data: newOpp });
+    const saved = await addOpportunity(newOpp);
+    return NextResponse.json({ success: true, data: saved });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
+/**
+ * Moderator / Admin update & approval route.
+ */
 export async function PATCH(request: Request) {
   try {
+    const { user, errorResponse } = await requireRole(request, ['moderator', 'admin']);
+    if (errorResponse) {
+      return errorResponse;
+    }
+
     const body = await request.json();
-    const { id, status, discovery_confidence, conference_tier, submission_deadline, contributors } = body;
+    const {
+      id,
+      status,
+      discovery_confidence,
+      conference_tier,
+      submission_deadline,
+      application_deadline,
+      start_date,
+      end_date,
+      contributors,
+      approval_basis,
+      listing_status,
+    } = body;
+
     if (!id) {
       return NextResponse.json({ success: false, error: 'Missing opportunity ID' }, { status: 400 });
     }
 
-    const events = getOpportunities();
-    const index = events.findIndex(e => e.id === id);
-    if (index === -1) {
-      return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });
+    const updates: Partial<TechOpportunity> = {};
+
+    if (status) {
+      updates.status = status;
+      // If approving item to published, record provenance
+      if (status === 'published') {
+        updates.approved_by = user!.email || user!.handle || user!.id;
+        updates.approved_at = new Date().toISOString();
+        updates.approval_basis = approval_basis || 'Verified by moderator';
+        updates.discovery_confidence = 'high';
+      }
     }
 
-    if (status) events[index].status = status;
-    if (discovery_confidence) events[index].discovery_confidence = discovery_confidence;
-    if (conference_tier !== undefined) events[index].conference_tier = conference_tier;
-    if (submission_deadline !== undefined) events[index].submission_deadline = submission_deadline;
-    if (contributors !== undefined) events[index].contributors = contributors;
-    events[index].updated_at = new Date().toISOString();
+    if (discovery_confidence) updates.discovery_confidence = discovery_confidence;
+    if (conference_tier !== undefined) updates.conference_tier = conference_tier;
+    if (submission_deadline !== undefined) updates.submission_deadline = submission_deadline;
+    if (application_deadline !== undefined) updates.application_deadline = application_deadline;
+    if (start_date !== undefined) updates.start_date = start_date;
+    if (end_date !== undefined) updates.end_date = end_date;
+    if (contributors !== undefined) updates.contributors = contributors;
+    if (listing_status !== undefined) updates.listing_status = listing_status;
 
-    saveOpportunities(events);
-    return NextResponse.json({ success: true, data: events[index] });
+    const updated = await updateOpportunity(id, updates);
+    if (!updated) {
+      return NextResponse.json({ success: false, error: 'Opportunity not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, data: updated });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

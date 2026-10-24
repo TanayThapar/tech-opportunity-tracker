@@ -2,26 +2,20 @@
 
 import { UserProfile, UserRole } from '@/types/auth';
 
-const AUTH_STORAGE_KEY = 'techradar_auth_session_v1';
-const USERS_DB_KEY = 'techradar_registered_users_v1';
+const AUTH_STORAGE_KEY = 'techradar_auth_session_v2';
+const USERS_DB_KEY = 'techradar_registered_users_v2';
 
-// Strict Admin Whitelist: TanayThapar, Sanvi850, and panchadip125
-export const ADMIN_WHITELIST: string[] = ['tanaythapar', 'sanvi850', 'panchadip125'];
-
-export function isWhitelistedAdmin(identifier: string): boolean {
-  if (!identifier) return false;
-  const clean = identifier.trim().toLowerCase().replace('@', '');
-  return ADMIN_WHITELIST.some(allowed => clean === allowed.toLowerCase());
-}
-
-function getRegisteredUsers(): UserProfile[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(USERS_DB_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+/**
+ * Checks whether Local Demo Mode is explicitly enabled.
+ * STRICT SAFETY RULE:
+ * Demo mode is enabled ONLY if NEXT_PUBLIC_DEMO_MODE=true AND NODE_ENV !== 'production'.
+ * Demo mode never grants admin or moderator permissions.
+ */
+export function isDemoMode(): boolean {
+  if (process.env.NODE_ENV === 'production') {
+    return false;
   }
+  return process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 }
 
 export function getCurrentUser(): UserProfile | null {
@@ -34,37 +28,36 @@ export function getCurrentUser(): UserProfile | null {
   }
 }
 
+/**
+ * Logs in user. In production or when demo mode is not enabled,
+ * fails closed if backend auth is not configured.
+ */
 export function login(identifier: string): { success: boolean; user?: UserProfile; error?: string } {
   const clean = identifier.trim();
-  if (!clean) return { success: false, error: 'Username, Handle, or Email cannot be empty' };
+  if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
 
-  const users = getRegisteredUsers();
-  const lowerClean = clean.toLowerCase().replace('@', '');
-
-  let user = users.find(
-    u => u.handle.toLowerCase() === lowerClean || u.email.toLowerCase() === lowerClean
-  );
-
-  const isAdmin = isWhitelistedAdmin(clean) || (user && isWhitelistedAdmin(user.handle));
-
-  if (!user) {
-    user = {
-      id: `usr-${Date.now()}`,
-      email: clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@user.radar`,
-      name: clean,
-      handle: clean.replace('@', ''),
-      role: isAdmin ? 'admin' : 'user',
-      createdAt: new Date().toISOString(),
-    };
-    users.push(user);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-    }
-  } else {
-    if (isAdmin) {
-      user.role = 'admin';
+  if (!isDemoMode()) {
+    // In production or standard mode without Supabase Auth setup: fail closed
+    if (typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return {
+        success: false,
+        error: 'Authentication failed closed: Supabase Auth is not configured in this environment. Demo mode is disabled.',
+      };
     }
   }
+
+  // Demo mode sandbox login: STRICTLY grants 'user' role only. Never admin or moderator.
+  const lowerClean = clean.toLowerCase().replace('@', '');
+  const email = clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@demo.radar`;
+
+  const user: UserProfile = {
+    id: `usr-demo-${Date.now()}`,
+    email,
+    name: clean,
+    handle: clean.replace('@', ''),
+    role: 'user', // Demo mode NEVER grants admin or moderator!
+    createdAt: new Date().toISOString(),
+  };
 
   if (typeof window !== 'undefined') {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
@@ -75,39 +68,7 @@ export function login(identifier: string): { success: boolean; user?: UserProfil
 }
 
 export function signup(name: string, identifier: string): { success: boolean; user?: UserProfile; error?: string } {
-  const clean = identifier.trim();
-  if (!clean) return { success: false, error: 'Username or Email is required' };
-  if (!name.trim()) return { success: false, error: 'Name is required' };
-
-  const users = getRegisteredUsers();
-  const lowerClean = clean.toLowerCase().replace('@', '');
-
-  const existing = users.find(
-    u => u.handle.toLowerCase() === lowerClean || u.email.toLowerCase() === lowerClean
-  );
-  if (existing) {
-    return login(clean);
-  }
-
-  const isAdmin = isWhitelistedAdmin(clean);
-
-  const newUser: UserProfile = {
-    id: `usr-${Date.now()}`,
-    email: clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@user.radar`,
-    name: name.trim(),
-    handle: clean.replace('@', ''),
-    role: isAdmin ? 'admin' : 'user',
-    createdAt: new Date().toISOString(),
-  };
-
-  users.push(newUser);
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newUser));
-    window.dispatchEvent(new Event('techradar_auth_change'));
-  }
-
-  return { success: true, user: newUser };
+  return login(identifier);
 }
 
 export function logout(): void {

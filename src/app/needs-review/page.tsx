@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import OpportunityCard from '@/components/OpportunityCard';
 import { TechOpportunity } from '@/types';
-import { AlertCircle, CheckCircle2, RefreshCw, ShieldAlert, ArrowLeft, Terminal } from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth';
+import { AlertCircle, CheckCircle2, RefreshCw, ShieldAlert, ArrowLeft, Shield, Check } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 
@@ -12,14 +13,22 @@ export default function NeedsReviewPage() {
   const [reviewItems, setReviewItems] = useState<TechOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [approvalBasis, setApprovalBasis] = useState('Organizer official link and dates verified');
 
-  const fetchLowConfidenceEvents = async () => {
+  const fetchPendingEvents = async () => {
+    const user = getCurrentUser();
     try {
       setLoading(true);
-      const res = await fetch('/api/opportunities?confidence=low');
+      const headers: Record<string, string> = {};
+      if (user?.email) headers['x-user-email'] = user.email;
+      if (user?.id) headers['x-user-id'] = user.id;
+
+      const res = await fetch('/api/opportunities?status=needs_review', { headers });
       const json = await res.json();
       if (json.success) {
         setReviewItems(json.data);
+      } else {
+        setStatusMessage(json.error || 'Failed to load review items');
       }
     } catch (err) {
       console.error('Failed fetching review items:', err);
@@ -29,24 +38,36 @@ export default function NeedsReviewPage() {
   };
 
   useEffect(() => {
-    fetchLowConfidenceEvents();
+    fetchPendingEvents();
   }, []);
 
-  const handleVerify = async (id: string) => {
+  const handleApprove = async (id: string) => {
+    const user = getCurrentUser();
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (user?.email) headers['x-user-email'] = user.email;
+      if (user?.id) headers['x-user-id'] = user.id;
+
       const res = await fetch('/api/opportunities', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, discovery_confidence: 'high' }),
+        headers,
+        body: JSON.stringify({
+          id,
+          status: 'published',
+          discovery_confidence: 'high',
+          approval_basis: approvalBasis,
+        }),
       });
       const data = await res.json();
       if (data.success) {
         setReviewItems(prev => prev.filter(item => item.id !== id));
-        setStatusMessage('Item verified and elevated to High Confidence.');
+        setStatusMessage('Item approved and published to the live public catalog.');
         setTimeout(() => setStatusMessage(null), 4000);
+      } else {
+        alert(data.error || 'Failed to approve item');
       }
     } catch (err) {
-      console.error('Error verifying item:', err);
+      console.error('Error approving item:', err);
     }
   };
 
@@ -65,7 +86,7 @@ export default function NeedsReviewPage() {
           </Link>
         </div>
 
-        {/* Terminal Header */}
+        {/* Header */}
         <div className="p-4 rounded-xl bg-[#0d1319] border border-amber-500/50 shadow-lg">
           <div className="flex items-start gap-3">
             <div className="p-2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">
@@ -74,16 +95,28 @@ export default function NeedsReviewPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-bold text-amber-300">
-                  // AUDIT_BACKLOG: LOW_CONFIDENCE_ITEMS
+                  // MODERATION_QUEUE: UNPUBLISHED_ITEMS_PENDING_REVIEW
                 </h1>
                 <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-950 text-amber-300 border border-amber-500/60">
                   {reviewItems.length} PENDING
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-1 max-w-3xl">
-                These events were auto-published per policy, but were flagged with low confidence due to tentative dates, unverified community links, or near-duplicate similarities.
+                Per publication policy, only high-confidence items from structured adapters auto-publish.
+                User submissions, admin entries, AI-extracted records, and low-confidence items remain unpublished until a human moderator approves them.
               </p>
             </div>
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center gap-3 text-xs">
+            <span className="text-zinc-500 font-semibold">Approval Basis Note:</span>
+            <input
+              type="text"
+              value={approvalBasis}
+              onChange={e => setApprovalBasis(e.target.value)}
+              className="bg-[#080c10] border border-zinc-800 rounded px-2.5 py-1 text-zinc-200 focus:outline-none focus:border-emerald-500 flex-1 max-w-md text-xs font-mono"
+              placeholder="e.g. Organizer official link and dates verified"
+            />
           </div>
         </div>
 
@@ -97,14 +130,14 @@ export default function NeedsReviewPage() {
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center text-zinc-500 text-xs">
             <RefreshCw className="w-5 h-5 animate-spin mb-2 text-emerald-400" />
-            <p>// Fetching review backlog...</p>
+            <p>// Fetching review queue...</p>
           </div>
         ) : reviewItems.length === 0 ? (
-          <div className="py-16 text-center bg-[#090e13] rounded-xl border border-zinc-800 p-8">
-            <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-400 mb-2" />
-            <h3 className="text-sm font-bold text-zinc-200">// All events verified!</h3>
-            <p className="text-xs text-zinc-500 mt-1">
-              No discovered opportunities currently need manual review.
+          <div className="p-12 text-center rounded-xl bg-[#0d1319] border border-zinc-800 space-y-3">
+            <Check className="w-8 h-8 text-emerald-400 mx-auto" />
+            <h2 className="text-sm font-bold text-zinc-200">// QUEUE_EMPTY</h2>
+            <p className="text-xs text-zinc-500 max-w-md mx-auto">
+              All opportunities in the system are currently reviewed and accounted for.
             </p>
           </div>
         ) : (
@@ -113,8 +146,8 @@ export default function NeedsReviewPage() {
               <OpportunityCard
                 key={item.id}
                 opportunity={item}
-                onUpdateConfidence={handleVerify}
                 showReviewActions={true}
+                onApprove={handleApprove}
               />
             ))}
           </div>

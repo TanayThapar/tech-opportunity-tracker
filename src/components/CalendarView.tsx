@@ -48,6 +48,7 @@ interface CalendarViewProps {
 const TYPE_PILL: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   hackathon: { bg: 'bg-purple-600/90', text: 'text-white', border: 'border-purple-400/40', dot: 'bg-purple-400' },
   conference: { bg: 'bg-blue-600/90', text: 'text-white', border: 'border-blue-400/40', dot: 'bg-blue-400' },
+  job:        { bg: 'bg-indigo-600/90', text: 'text-white', border: 'border-indigo-400/40', dot: 'bg-indigo-400' },
   workshop:   { bg: 'bg-emerald-600/90', text: 'text-white', border: 'border-emerald-400/40', dot: 'bg-emerald-400' },
   internship: { bg: 'bg-amber-500/90', text: 'text-black font-bold', border: 'border-amber-400/40', dot: 'bg-amber-400' },
   deadline:   { bg: 'bg-red-600/90', text: 'text-white', border: 'border-red-400/40', dot: 'bg-red-400' },
@@ -177,7 +178,7 @@ export default function CalendarView({ opportunities, onRefresh }: CalendarViewP
 
         {/* Legend */}
         <div className="hidden sm:flex items-center gap-3 text-[11px]">
-          {(['hackathon', 'conference', 'workshop', 'internship'] as const).map(t => (
+          {(['hackathon', 'conference', 'job', 'workshop', 'internship'] as const).map(t => (
             <span key={t} className="flex items-center gap-1 text-gray-600 dark:text-gray-400 capitalize">
               <span className={`w-2 h-2 rounded-sm ${TYPE_PILL[t].bg}`} />
               {t}s

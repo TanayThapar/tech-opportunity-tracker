@@ -15,6 +15,8 @@ import {
   MessageSquare,
   Send,
   UserCheck,
+  ShieldCheck,
+  Clock,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,12 +25,14 @@ interface OpportunityCardProps {
   opportunity: TechOpportunity;
   onUpdateConfidence?: (id: string, newConfidence: 'high' | 'low') => void;
   showReviewActions?: boolean;
+  onApprove?: (id: string) => void;
 }
 
 export default function OpportunityCard({
   opportunity,
   onUpdateConfidence,
   showReviewActions = false,
+  onApprove,
 }: OpportunityCardProps) {
   const [isStarred, setIsStarred] = useState(false);
   const [isParticipating, setIsParticipating] = useState(false);
@@ -70,24 +74,37 @@ export default function OpportunityCard({
     setCommentText('');
   };
 
-  const formatDateRange = (startStr: string, endStr: string, isInternship: boolean) => {
+  const formatDateRange = () => {
+    if (opportunity.type === 'job') {
+      if (opportunity.application_deadline) {
+        try {
+          return `DEADLINE: ${format(parseISO(opportunity.application_deadline), 'yyyy-MM-dd')}`;
+        } catch {
+          return `DEADLINE: ${opportunity.application_deadline}`;
+        }
+      }
+      return 'NO DEADLINE LISTED (ROLLING)';
+    }
+
     try {
-      const s = parseISO(startStr);
-      const e = parseISO(endStr);
-      if (isInternship) {
+      const s = parseISO(opportunity.start_date);
+      const e = parseISO(opportunity.end_date);
+      if (opportunity.type === 'internship') {
         return `DEADLINE: ${format(e, 'yyyy-MM-dd')}`;
       }
-      if (startStr === endStr) {
+      if (opportunity.start_date === opportunity.end_date) {
         return format(s, 'yyyy-MM-dd');
       }
       return `${format(s, 'yyyy-MM-dd')} -> ${format(e, 'yyyy-MM-dd')}`;
     } catch {
-      return `${startStr} -> ${endStr}`;
+      return `${opportunity.start_date} -> ${opportunity.end_date}`;
     }
   };
 
   const isLowConfidence = opportunity.discovery_confidence === 'low';
   const categoryConfig = CATEGORY_COLORS[opportunity.type] || CATEGORY_COLORS.hackathon;
+  const isStaleOrUnreachable =
+    opportunity.link_status === 'unreachable' || opportunity.listing_status === 'stale';
 
   return (
     <motion.div
@@ -111,6 +128,12 @@ export default function OpportunityCard({
             <TypeBadge type={opportunity.type} />
             {opportunity.type === 'conference' && <TierBadge tier={opportunity.conference_tier} />}
             <ConfidenceBadge confidence={opportunity.discovery_confidence} />
+            {opportunity.approved_by && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-950/60 text-emerald-300 border border-emerald-500/40">
+                <ShieldCheck className="w-3 h-3" />
+                Approved
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -138,172 +161,167 @@ export default function OpportunityCard({
               title={isParticipating ? 'You marked: Participating' : 'Mark as participating'}
             >
               <UserCheck className="w-3.5 h-3.5" />
-              <span>{isParticipating ? 'ATTENDING' : '+ ATTEND'}</span>
+              <span className="hidden sm:inline">{isParticipating ? 'ATTENDING' : 'ATTEND'}</span>
             </button>
           </div>
         </div>
 
-        {/* Title as Hyperlink */}
-        <h3 className="text-sm sm:text-base font-bold text-zinc-100 tracking-tight leading-snug mb-2 group-hover:text-emerald-400 transition-colors">
-          <a
-            href={opportunity.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 hover:underline decoration-emerald-500 underline-offset-4"
-          >
-            <span>{opportunity.title}</span>
-            <ExternalLink className="w-3.5 h-3.5 text-zinc-500 group-hover:text-emerald-400 flex-shrink-0" />
-          </a>
+        {/* Title */}
+        <h3 className="font-bold text-base text-zinc-100 group-hover:text-emerald-400 transition-colors leading-snug">
+          {opportunity.title}
         </h3>
 
-        {/* Terminal Metadata Table */}
-        <div className="space-y-1 text-xs text-zinc-400 font-mono mb-3 bg-zinc-950/60 p-2 rounded border border-zinc-800/60">
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-600">ORG:</span>
-            <span className="text-zinc-200 truncate">{opportunity.organizer}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-600">DATE:</span>
-            <span className="text-emerald-300 font-medium">
-              {formatDateRange(opportunity.start_date, opportunity.end_date, opportunity.type === 'internship')}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-600">LOC:</span>
-            <FormatBadge format={opportunity.format} location={opportunity.location} />
-          </div>
+        {/* Organizer / Company */}
+        <div className="flex items-center gap-1.5 text-xs text-zinc-400 mt-2 font-medium">
+          <Building2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+          <span className="truncate">{opportunity.company || opportunity.organizer}</span>
         </div>
+
+        {/* Date / Submission Deadline */}
+        <div className="flex flex-col gap-1 mt-2 text-xs">
+          <div className="flex items-center gap-1.5 text-zinc-300">
+            <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="font-semibold">{formatDateRange()}</span>
+          </div>
+
+          {opportunity.submission_deadline && opportunity.type === 'conference' && (
+            <div className="text-[11px] text-amber-400 flex items-center gap-1 pl-5">
+              <span>Paper / CFP Deadline:</span>
+              <span className="font-bold">{opportunity.submission_deadline.slice(0, 10)}</span>
+              <span className="text-[10px] text-zinc-500">(UTC)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Format / Location */}
+        <div className="flex items-center gap-1.5 text-xs text-zinc-400 mt-2">
+          <MapPin className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+          <FormatBadge format={opportunity.work_mode || opportunity.format} location={opportunity.location} />
+        </div>
+
+        {/* Stale or Unreachable Warning Badge for Jobs */}
+        {isStaleOrUnreachable && (
+          <div className="mt-2.5 p-1.5 bg-amber-950/40 border border-amber-500/50 rounded text-[11px] text-amber-300 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>May no longer be open, confirm on the employer site</span>
+          </div>
+        )}
 
         {/* Description */}
-        <p className="text-xs text-zinc-400 leading-relaxed mb-3 line-clamp-3 font-mono">
-          &gt; {opportunity.description}
+        <p className="text-xs text-zinc-400 mt-3 line-clamp-3 leading-relaxed">
+          {opportunity.description}
         </p>
 
-        {/* Diagnostic flags for review */}
-        {isLowConfidence && opportunity.confidence_reasons && opportunity.confidence_reasons.length > 0 && (
-          <div className="mb-3 p-2.5 rounded bg-amber-950/30 border border-amber-500/40 text-[11px] text-amber-200">
-            <div className="flex items-center gap-1.5 font-bold mb-1 text-amber-400">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>AUDIT_NOTICE:</span>
-            </div>
-            <ul className="list-disc list-inside space-y-0.5 text-amber-300/90 font-mono">
-              {opportunity.confidence_reasons.map((reason, idx) => (
-                <li key={idx}>{reason}</li>
-              ))}
-            </ul>
+        {/* Job Timestamp Note */}
+        {opportunity.type === 'job' && (
+          <div className="mt-2 text-[10px] text-zinc-500 flex items-center gap-1">
+            <Clock className="w-3 h-3 text-zinc-600" />
+            <span>Listing as of {opportunity.last_checked_at?.slice(0, 10) || opportunity.posted_date || 'fetch time'}, confirm on the employer site</span>
+          </div>
+        )}
+
+        {/* Provenance note */}
+        {opportunity.approval_basis && (
+          <div className="mt-2 text-[10px] text-zinc-500 italic">
+            Approval note: {opportunity.approval_basis} ({opportunity.approved_by})
+          </div>
+        )}
+
+        {/* Diagnostic Confidence Reasons (if low or on review page) */}
+        {opportunity.confidence_reasons && opportunity.confidence_reasons.length > 0 && (
+          <div className="mt-3 p-2 bg-zinc-950/80 rounded border border-zinc-800/80 text-[11px] space-y-1">
+            <span className="text-zinc-500 font-bold uppercase tracking-wider block text-[10px]">
+              AUDIT_REASONS:
+            </span>
+            {opportunity.confidence_reasons.map((reason, idx) => (
+              <div key={idx} className="text-zinc-400 flex items-start gap-1">
+                <span className="text-zinc-600">•</span>
+                <span>{reason}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Footer & Interactions */}
-      <div className="pt-2.5 border-t border-zinc-800/80 flex items-center justify-between mt-auto text-xs">
-        <div className="flex items-center gap-3">
-          <a
-            href={opportunity.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-semibold"
-          >
-            <span>[SOURCE_LINK]</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
+      {/* Card Footer Actions */}
+      <div className="mt-4 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+        <a
+          href={opportunity.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
+        >
+          <span>Official Portal</span>
+          <ExternalLink className="w-3 h-3" />
+        </a>
 
-          {/* Comments count trigger */}
+        <div className="flex items-center gap-2">
+          {/* Comments drawer toggle */}
           <button
             onClick={() => setShowCommentsDrawer(!showCommentsDrawer)}
-            className="flex items-center gap-1 text-zinc-400 hover:text-cyan-400 transition-colors"
+            className="flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition-colors py-1 px-1.5 rounded hover:bg-zinc-800"
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            <span>{comments.length} notes</span>
+            <span>{comments.length}</span>
           </button>
-        </div>
 
-        {showReviewActions && onUpdateConfidence && (
-          <div>
-            {isLowConfidence ? (
-              <button
-                onClick={() => onUpdateConfidence(opportunity.id, 'high')}
-                className="px-2 py-1 text-[11px] font-bold rounded bg-emerald-950/70 border border-emerald-500/80 text-emerald-300 hover:bg-emerald-900/80 flex items-center gap-1"
-              >
-                <CheckCircle2 className="w-3 h-3" />
-                <span>APPROVE</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => onUpdateConfidence(opportunity.id, 'low')}
-                className="px-2 py-1 text-[11px] font-semibold rounded bg-zinc-800 hover:bg-amber-950/60 border border-zinc-700 hover:border-amber-500/50 text-zinc-400 hover:text-amber-300"
-              >
-                <span>FLAG</span>
-              </button>
-            )}
-          </div>
-        )}
+          {/* Review actions if shown */}
+          {showReviewActions && onApprove && (
+            <button
+              onClick={() => onApprove(opportunity.id)}
+              className="px-2.5 py-1 bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/60 text-emerald-300 font-bold text-xs rounded transition-colors flex items-center gap-1"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Approve & Publish</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Interactive Terminal Comments & Notes Drawer */}
+      {/* Slide-out comments section */}
       <AnimatePresence>
         {showCommentsDrawer && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="mt-3 pt-3 border-t border-zinc-800/80 space-y-2 overflow-hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-3 pt-3 border-t border-zinc-800/90 text-xs overflow-hidden"
           >
-            <div className="text-[11px] text-zinc-400 font-bold uppercase tracking-wider flex items-center justify-between">
-              <span>// COMMUNITY_NOTES & PARTICIPANT_COMMENTS</span>
-              <span className="text-zinc-600">{comments.length} entries</span>
-            </div>
+            <span className="text-zinc-500 font-bold uppercase tracking-wider block text-[10px] mb-2">
+              COMMUNITY_COMMENTS:
+            </span>
 
-            {/* List of comments */}
-            <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+            <div className="space-y-2 max-h-36 overflow-y-auto mb-2 pr-1">
               {comments.length === 0 ? (
-                <div className="text-[11px] text-zinc-600 italic py-1">
-                  No notes logged yet. Be the first to comment or share team plans!
-                </div>
+                <p className="text-zinc-600 italic text-[11px]">// No discussion yet. Be the first to comment.</p>
               ) : (
                 comments.map(c => (
-                  <div
-                    key={c.id}
-                    className="p-2 rounded bg-zinc-950 border border-zinc-800/60 text-[11px] text-zinc-300"
-                  >
+                  <div key={c.id} className="p-1.5 bg-[#080d11] rounded border border-zinc-800/60 text-[11px]">
                     <div className="flex items-center justify-between text-zinc-500 text-[10px] mb-0.5">
-                      <span className="text-cyan-400 font-semibold">@{c.author}</span>
-                      <span>{format(parseISO(c.timestamp), 'MMM d, HH:mm')}</span>
+                      <span className="font-bold text-zinc-400">{c.author}</span>
+                      <span>{c.timestamp.slice(0, 10)}</span>
                     </div>
-                    <p className="text-zinc-300 font-mono break-words">{c.text}</p>
+                    <p className="text-zinc-300">{c.text}</p>
                   </div>
                 ))
               )}
             </div>
 
-            {/* Add comment form */}
-            <form onSubmit={handleAddComment} className="space-y-1.5 pt-1">
+            <form onSubmit={handleAddComment} className="flex gap-1.5 mt-2">
               <input
                 type="text"
-                placeholder="Your handle (e.g. alice, team-alpha)"
-                value={commentAuthor}
-                onChange={e => setCommentAuthor(e.target.value)}
-                className="w-full px-2.5 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded focus:outline-none focus:border-emerald-500 text-zinc-200 placeholder-zinc-600 font-mono"
+                placeholder="Add a comment..."
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                className="flex-1 bg-[#080d11] border border-zinc-800 rounded px-2 py-1 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500 font-mono"
               />
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  placeholder="Add note, finding teammates, or advice..."
-                  value={commentText}
-                  onChange={e => setCommentText(e.target.value)}
-                  className="flex-1 px-2.5 py-1 text-xs bg-zinc-950 border border-zinc-800 rounded focus:outline-none focus:border-emerald-500 text-zinc-200 placeholder-zinc-600 font-mono"
-                />
-                <button
-                  type="submit"
-                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-xs rounded flex items-center gap-1 transition-colors"
-                >
-                  <Send className="w-3 h-3" />
-                  <span>POST</span>
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="p-1 bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/60 text-emerald-300 rounded transition-colors"
+                title="Send comment"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
             </form>
           </motion.div>
         )}
