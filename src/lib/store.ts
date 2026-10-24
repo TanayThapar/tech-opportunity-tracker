@@ -542,6 +542,26 @@ export async function addUserUpdate(update: Omit<UserUpdate, 'id' | 'created_at'
   return full;
 }
 
+export async function markUpdateAsRead(userId: string, updateId: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    const { error } = await supabase
+      .from('user_updates')
+      .update({ read: true })
+      .eq('id', updateId)
+      .eq('user_id', userId);
+    return !error;
+  }
+
+  const list = memoryUpdates.get(userId) || [];
+  const item = list.find(u => u.id === updateId);
+  if (item) {
+    item.read = true;
+    return true;
+  }
+  return false;
+}
+
 export async function hasNotificationBeenSent(
   userId: string,
   eventKey: string,

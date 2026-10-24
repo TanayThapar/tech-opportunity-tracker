@@ -7,6 +7,7 @@ export interface UserProfile {
   handle: string;
   role: UserRole;
   createdAt: string;
+  passwordHash?: string;
 }
 
 export interface AuthState {

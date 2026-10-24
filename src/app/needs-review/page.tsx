@@ -4,10 +4,9 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import OpportunityCard from '@/components/OpportunityCard';
 import { TechOpportunity } from '@/types';
-import { getCurrentUser, fetchCurrentUser } from '@/lib/auth';
+import { getCurrentUser, fetchCurrentUser, getAuthHeaders } from '@/lib/auth';
 import { AlertCircle, CheckCircle2, RefreshCw, ShieldAlert, ArrowLeft, Shield, Check } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'motion/react';
 
 export default function NeedsReviewPage() {
   const [reviewItems, setReviewItems] = useState<TechOpportunity[]>([]);
@@ -16,18 +15,12 @@ export default function NeedsReviewPage() {
   const [approvalBasis, setApprovalBasis] = useState('Organizer official link and dates verified');
 
   const fetchPendingEvents = async () => {
-    let user = getCurrentUser();
     try {
       setLoading(true);
-      const serverUser = await fetchCurrentUser();
-      if (serverUser) user = serverUser;
-
-      const headers: Record<string, string> = {};
-      if (user?.email) headers['x-user-email'] = user.email;
-      if (user?.id) headers['x-user-id'] = user.id;
-      if (user?.handle) headers['x-user-handle'] = user.handle;
-
-      const res = await fetch('/api/opportunities?status=needs_review', { headers });
+      await fetchCurrentUser();
+      const res = await fetch('/api/opportunities?status=needs_review', {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       if (json.success) {
         setReviewItems(json.data);
@@ -46,19 +39,10 @@ export default function NeedsReviewPage() {
   }, []);
 
   const handleApprove = async (id: string) => {
-    let user = getCurrentUser();
     try {
-      const serverUser = await fetchCurrentUser();
-      if (serverUser) user = serverUser;
-
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (user?.email) headers['x-user-email'] = user.email;
-      if (user?.id) headers['x-user-id'] = user.id;
-      if (user?.handle) headers['x-user-handle'] = user.handle;
-
       const res = await fetch('/api/opportunities', {
         method: 'PATCH',
-        headers,
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           id,
           status: 'published',
@@ -80,83 +64,91 @@ export default function NeedsReviewPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b0e] text-zinc-200 font-mono flex flex-col">
+    <div className="min-h-screen bg-[#0c1015] text-[#e6edf3] font-sans flex flex-col">
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-5">
         <div>
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-lime-400 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>&lt;- cd .. (return to calendar)</span>
+            <span>← Return to Opportunity Radar</span>
           </Link>
         </div>
 
         {/* Header */}
-        <div className="p-4 rounded-xl bg-[#0d1319] border border-amber-500/50 shadow-lg">
+        <div className="p-5 rounded-xl bg-[#111620] border border-amber-500/40 shadow-sm">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">
-              <ShieldAlert className="w-5 h-5" />
+            <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              <ShieldAlert className="w-6 h-6" />
             </div>
-            <div>
+            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold text-amber-300">
-                  // MODERATION_QUEUE: UNPUBLISHED_ITEMS_PENDING_REVIEW
+                <h1 className="text-lg sm:text-xl font-bold text-white">
+                  Moderation & Review Quarantine
                 </h1>
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-950 text-amber-300 border border-amber-500/60">
+                <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-500/50">
                   {reviewItems.length} PENDING
                 </span>
               </div>
-              <p className="text-xs text-zinc-400 mt-1 max-w-3xl">
-                Per publication policy, only high-confidence items from structured adapters auto-publish.
-                User submissions, admin entries, AI-extracted records, and low-confidence items remain unpublished until a human moderator approves them.
+              <p className="text-xs text-slate-400 leading-relaxed max-w-3xl">
+                Unverified entries, AI extractions, or items with missing critical dates remain quarantined here. Items in this queue do not appear on the public radar until approved by a moderator.
               </p>
             </div>
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-zinc-800/80 flex flex-wrap items-center gap-3 text-xs">
-            <span className="text-zinc-500 font-semibold">Approval Basis Note:</span>
-            <input
-              type="text"
-              value={approvalBasis}
-              onChange={e => setApprovalBasis(e.target.value)}
-              className="bg-[#080c10] border border-zinc-800 rounded px-2.5 py-1 text-zinc-200 focus:outline-none focus:border-emerald-500 flex-1 max-w-md text-xs font-mono"
-              placeholder="e.g. Organizer official link and dates verified"
-            />
           </div>
         </div>
 
         {statusMessage && (
-          <div className="p-2.5 bg-emerald-950/40 border border-emerald-500/70 text-emerald-300 rounded text-xs flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className="p-3 bg-lime-950/40 border border-lime-500/40 text-lime-300 text-xs rounded-lg flex items-center gap-2">
+            <Check className="w-4 h-4 text-lime-400 shrink-0" />
             <span>{statusMessage}</span>
           </div>
         )}
 
+        {/* Approval basis control */}
+        <div className="p-4 bg-[#111620] border border-slate-800 rounded-xl space-y-2">
+          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+            Verification Basis (Mandatory record on human approval)
+          </label>
+          <input
+            type="text"
+            value={approvalBasis}
+            onChange={e => setApprovalBasis(e.target.value)}
+            className="w-full bg-[#0c1015] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400"
+            placeholder="e.g. Organizer official website and schedule manually verified"
+          />
+        </div>
+
+        {/* Pending Items Grid */}
         {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center text-zinc-500 text-xs">
-            <RefreshCw className="w-5 h-5 animate-spin mb-2 text-emerald-400" />
-            <p>// Fetching review queue...</p>
+          <div className="p-12 text-center text-xs text-slate-400 font-mono">
+            Loading quarantined candidates...
           </div>
         ) : reviewItems.length === 0 ? (
-          <div className="p-12 text-center rounded-xl bg-[#0d1319] border border-zinc-800 space-y-3">
-            <Check className="w-8 h-8 text-emerald-400 mx-auto" />
-            <h2 className="text-sm font-bold text-zinc-200">// QUEUE_EMPTY</h2>
-            <p className="text-xs text-zinc-500 max-w-md mx-auto">
-              All opportunities in the system are currently reviewed and accounted for.
+          <div className="p-12 text-center rounded-xl bg-[#111620] border border-slate-800 space-y-2">
+            <CheckCircle2 className="w-8 h-8 text-lime-400 mx-auto" />
+            <h3 className="text-sm font-bold text-white">Quarantine Queue Clear</h3>
+            <p className="text-xs text-slate-400">
+              No items currently require human verification.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-4">
             {reviewItems.map(item => (
-              <OpportunityCard
-                key={item.id}
-                opportunity={item}
-                showReviewActions={true}
-                onApprove={handleApprove}
-              />
+              <div key={item.id} className="relative group">
+                <OpportunityCard opportunity={item} />
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={() => handleApprove(item.id)}
+                    className="px-4 py-2 bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Approve & Publish to Radar</span>
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         )}

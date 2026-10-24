@@ -2,6 +2,34 @@ import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { UserProfile, UserRole } from '@/types/auth';
 import { getProfileByEmail, getProfileById, getProfileByHandle, saveProfile } from '@/lib/store';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+export interface SessionData {
+  userId: string;
+  email: string;
+  handle: string;
+  role: UserRole;
+  exp: number;
+}
+
+let memorySessionSecret: string | null = null;
+
+/**
+ * Retrieves the cryptographic session signing secret.
+ * Falls back to a deterministic key in test or random key in local dev.
+ */
+export function getSessionSecret(): string {
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16) {
+    return process.env.SESSION_SECRET.trim();
+  }
+  if (!memorySessionSecret) {
+    memorySessionSecret =
+      process.env.NODE_ENV === 'test'
+        ? 'vitest-test-session-secret-key-at-least-32-chars-long!!'
+        : crypto.randomBytes(32).toString('hex');
+  }
+  return memorySessionSecret;
+}
 
 /**
  * Constant-time comparison to prevent timing attacks.
@@ -15,6 +43,126 @@ export function timingSafeCompare(a: string, b: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Securely hashes passwords using standard scrypt.
+ */
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+/**
+ * Verifies a password against a stored scrypt salt:hash string using constant-time comparison.
+ */
+export function verifyPassword(password: string, storedHash?: string | null): boolean {
+  if (!storedHash || !storedHash.includes(':')) return false;
+  try {
+    const [salt, key] = storedHash.split(':');
+    if (!salt || !key) return false;
+    const keyBuffer = Buffer.from(key, 'hex');
+    const derived = crypto.scryptSync(password, salt, 64);
+    if (keyBuffer.length !== derived.length) return false;
+    return crypto.timingSafeEqual(keyBuffer, derived);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Creates an HMAC-SHA256 signed JWT session token.
+ */
+export function createSessionToken(
+  payload: { userId: string; email: string; handle: string; role: UserRole },
+  expiresInSeconds = 7 * 24 * 60 * 60
+): string {
+  const secret = getSessionSecret();
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const data = {
+    sub: payload.userId,
+    email: payload.email,
+    handle: payload.handle,
+    role: payload.role,
+    iat: now,
+    exp: now + expiresInSeconds,
+  };
+
+  const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');
+  const payloadB64 = Buffer.from(JSON.stringify(data)).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(`${headerB64}.${payloadB64}`)
+    .digest('base64url');
+
+  return `${headerB64}.${payloadB64}.${signature}`;
+}
+
+/**
+ * Verifies and decodes an HMAC-SHA256 signed session token.
+ */
+export function verifySessionToken(token: string): { valid: boolean; data?: SessionData; error?: string } {
+  try {
+    if (!token || typeof token !== 'string') {
+      return { valid: false, error: 'Token missing' };
+    }
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return { valid: false, error: 'Malformed token structure' };
+    }
+    const [headerB64, payloadB64, signature] = parts;
+    const secret = getSessionSecret();
+
+    const expectedSig = crypto
+      .createHmac('sha256', secret)
+      .update(`${headerB64}.${payloadB64}`)
+      .digest('base64url');
+
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSig);
+
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+      return { valid: false, error: 'Invalid token signature' };
+    }
+
+    const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf-8');
+    const payload = JSON.parse(payloadJson);
+
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      return { valid: false, error: 'Token expired' };
+    }
+
+    return {
+      valid: true,
+      data: {
+        userId: payload.sub,
+        email: payload.email,
+        handle: payload.handle,
+        role: payload.role,
+        exp: payload.exp,
+      },
+    };
+  } catch (err: any) {
+    return { valid: false, error: err.message || 'Token verification exception' };
+  }
+}
+
+/**
+ * Parses HTTP cookie header into key-value map.
+ */
+export function parseCookies(cookieHeader: string | null): Record<string, string> {
+  if (!cookieHeader) return {};
+  const cookies: Record<string, string> = {};
+  for (const pair of cookieHeader.split(';')) {
+    const [name, ...rest] = pair.trim().split('=');
+    if (name) {
+      cookies[name] = decodeURIComponent(rest.join('='));
+    }
+  }
+  return cookies;
 }
 
 /**
@@ -37,7 +185,6 @@ export function verifyCronSecret(authHeader: string | null): boolean {
 
 /**
  * Gets bootstrap admin emails/handles from server-only environment variable.
- * Re-grants TanayThapar, Sanvi850, panchadip125 and any others configured server-side.
  */
 export function getBootstrapAdminEmails(): string[] {
   const envEmails =
@@ -64,71 +211,119 @@ export function isBootstrapAdmin(identifier?: string | null): boolean {
 }
 
 /**
- * Authenticates user from request headers and retrieves server-verified DB role.
- * NEVER trusts client-provided role claims.
+ * Returns a server Supabase client if environment credentials exist.
+ */
+function getSupabaseAuthClient(): SupabaseClient | null {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (supabaseUrl && supabaseKey) {
+    return createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+  }
+  return null;
+}
+
+/**
+ * Authenticates user strictly from validated session tokens (Bearer header or HTTP-only cookie).
+ *
+ * CRITICAL SECURITY:
+ * - NEVER trusts caller-supplied identity headers (x-user-id, x-user-email, x-user-handle, x-user-role).
+ * - Derives user identity and role solely from the verified cryptographic session and database record.
  */
 export async function getAuthenticatedUser(request: Request): Promise<UserProfile | null> {
   const authHeader = request.headers.get('authorization');
-  const userIdHeader = request.headers.get('x-user-id');
-  const userEmailHeader = request.headers.get('x-user-email');
-  const userHandleHeader = request.headers.get('x-user-handle');
+  let token: string | null = null;
 
-  let profile: UserProfile | null = null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
+  }
 
-  if (userIdHeader) {
-    profile = await getProfileById(userIdHeader);
-  }
-  if (!profile && userEmailHeader) {
-    profile = await getProfileByEmail(userEmailHeader);
-    if (!profile) {
-      profile = await getProfileByHandle(userEmailHeader);
-    }
-  }
-  if (!profile && userHandleHeader) {
-    profile = await getProfileByHandle(userHandleHeader);
-    if (!profile) {
-      profile = await getProfileByEmail(userHandleHeader);
-    }
-  }
-  if (!profile && authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7).trim();
-    profile = await getProfileById(token);
-    if (!profile) {
-      profile = await getProfileByEmail(token);
-    }
-    if (!profile) {
-      profile = await getProfileByHandle(token);
+  if (!token) {
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      const cookies = parseCookies(cookieHeader);
+      token = cookies['radar_session'] || null;
     }
   }
 
-  // If user does not exist in store yet, resolve bootstrap admin or auto-provision
-  const lookupCandidate = userEmailHeader || userHandleHeader || (userIdHeader?.startsWith('usr-') ? userIdHeader.slice(4) : userIdHeader);
-  if (!profile && lookupCandidate) {
-    const cleanCand = lookupCandidate.toLowerCase().trim().replace(/^@/, '');
-    const isBootstrap = isBootstrapAdmin(cleanCand);
-    const cleanHandle = (userHandleHeader || userEmailHeader?.split('@')[0] || cleanCand.split('@')[0]).replace(/^@/, '');
-    const cleanEmail = userEmailHeader || (cleanCand.includes('@') ? cleanCand : `${cleanHandle.toLowerCase()}@radar.internal`);
-
-    profile = await saveProfile({
-      id: userIdHeader || `usr-${cleanHandle.toLowerCase()}`,
-      email: cleanEmail,
-      name: cleanHandle,
-      handle: cleanHandle,
-      role: isBootstrap ? 'admin' : 'user',
-      createdAt: new Date().toISOString(),
-    });
+  if (!token) {
+    return null;
   }
 
-  // Ensure bootstrap admins are always verified as admin in DB
-  if (profile) {
-    const isBootstrap = isBootstrapAdmin(profile.email) || isBootstrapAdmin(profile.handle);
-    if (isBootstrap && profile.role !== 'admin') {
-      profile.role = 'admin';
-      await saveProfile(profile);
+  // 1. Try Supabase Auth token if Supabase credentials are configured
+  const supabase = getSupabaseAuthClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (data?.user && !error) {
+        let profile = await getProfileById(data.user.id);
+        if (!profile) {
+          const email = data.user.email || `${data.user.id}@supabase.auth`;
+          const handle = email.split('@')[0];
+          const isBootstrap = isBootstrapAdmin(email) || isBootstrapAdmin(handle);
+          profile = await saveProfile({
+            id: data.user.id,
+            email,
+            name: handle,
+            handle,
+            role: isBootstrap ? 'admin' : 'user',
+            createdAt: new Date().toISOString(),
+          });
+        }
+
+        if (profile) {
+          const isBootstrap = isBootstrapAdmin(profile.email) || isBootstrapAdmin(profile.handle);
+          if (isBootstrap && profile.role !== 'admin') {
+            profile.role = 'admin';
+            await saveProfile(profile);
+          }
+          const { passwordHash: _, ...sanitized } = profile;
+          return sanitized;
+        }
+      }
+    } catch {
+      // Continue to HMAC token verification
     }
   }
 
-  return profile;
+  // 2. Verify self-hosted cryptographic HMAC session token
+  const verification = verifySessionToken(token);
+  if (!verification.valid || !verification.data) {
+    return null;
+  }
+
+  const { userId, email, handle } = verification.data;
+
+  // Retrieve user record from database to enforce current role (never trust client claims)
+  let profile = await getProfileById(userId);
+  if (!profile && email) {
+    profile = await getProfileByEmail(email);
+  }
+  if (!profile && handle) {
+    profile = await getProfileByHandle(handle);
+  }
+
+  if (!profile) {
+    return null;
+  }
+
+  // Enforce server-side bootstrap admin verification
+  const isBootstrap = isBootstrapAdmin(profile.email) || isBootstrapAdmin(profile.handle);
+  if (isBootstrap && profile.role !== 'admin') {
+    profile.role = 'admin';
+    await saveProfile(profile);
+  }
+
+  const { passwordHash: _, ...sanitized } = profile;
+  return sanitized;
 }
 
 /**
@@ -144,7 +339,7 @@ export async function requireRole(
     return {
       user: null,
       errorResponse: NextResponse.json(
-        { success: false, error: 'Unauthorized: Authentication required' },
+        { success: false, error: 'Unauthorized: Authentication required with valid session' },
         { status: 401 }
       ),
     };

@@ -5,6 +5,7 @@ import { GET as getLogsGET } from '@/app/api/pipeline/logs/route';
 import { POST as updateRolePOST } from '@/app/api/admin/roles/route';
 import { PATCH as updateOppPATCH } from '@/app/api/opportunities/route';
 import { _resetMemoryStoreForTests, saveProfile, saveOpportunities } from '@/lib/store';
+import { createSessionToken } from '@/lib/serverAuth';
 
 describe('Demo Mode & Role Escalation Isolation', () => {
   const originalEnv = process.env;
@@ -20,6 +21,12 @@ describe('Demo Mode & Role Escalation Isolation', () => {
 
   it('ensures demo mode is disabled when NEXT_PUBLIC_DEMO_MODE=false', () => {
     process.env.NEXT_PUBLIC_DEMO_MODE = 'false';
+    expect(isDemoMode()).toBe(false);
+  });
+
+  it('fails closed in production environment even if NEXT_PUBLIC_DEMO_MODE=true', () => {
+    (process.env as any).NODE_ENV = 'production';
+    process.env.NEXT_PUBLIC_DEMO_MODE = 'true';
     expect(isDemoMode()).toBe(false);
   });
 
@@ -47,10 +54,16 @@ describe('Demo Mode & Role Escalation Isolation', () => {
       createdAt: '2026-10-24',
     });
 
+    const token = createSessionToken({
+      userId: standardUser.id,
+      email: standardUser.email,
+      handle: standardUser.handle,
+      role: standardUser.role,
+    });
+
     const req = new Request('http://localhost:3000/api/pipeline/logs', {
       headers: {
-        'x-user-id': standardUser.id,
-        'x-user-email': standardUser.email,
+        authorization: `Bearer ${token}`,
       },
     });
 
@@ -72,10 +85,17 @@ describe('Demo Mode & Role Escalation Isolation', () => {
       createdAt: '2026-10-24',
     });
 
+    const token = createSessionToken({
+      userId: standardUser.id,
+      email: standardUser.email,
+      handle: standardUser.handle,
+      role: standardUser.role,
+    });
+
     const req = new Request('http://localhost:3000/api/pipeline/run', {
       method: 'POST',
       headers: {
-        'x-user-id': standardUser.id,
+        authorization: `Bearer ${token}`,
       },
     });
 
@@ -93,11 +113,17 @@ describe('Demo Mode & Role Escalation Isolation', () => {
       createdAt: '2026-10-24',
     });
 
+    const token = createSessionToken({
+      userId: modUser.id,
+      email: modUser.email,
+      handle: modUser.handle,
+      role: modUser.role,
+    });
+
     const req = new Request('http://localhost:3000/api/admin/roles', {
       method: 'POST',
       headers: {
-        'x-user-id': modUser.id,
-        'x-user-email': modUser.email,
+        authorization: `Bearer ${token}`,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
@@ -118,6 +144,13 @@ describe('Demo Mode & Role Escalation Isolation', () => {
       handle: 'mod2',
       role: 'moderator',
       createdAt: '2026-10-24',
+    });
+
+    const token = createSessionToken({
+      userId: modUser.id,
+      email: modUser.email,
+      handle: modUser.handle,
+      role: modUser.role,
     });
 
     await saveOpportunities([
@@ -141,7 +174,7 @@ describe('Demo Mode & Role Escalation Isolation', () => {
     const req = new Request('http://localhost:3000/api/opportunities', {
       method: 'PATCH',
       headers: {
-        'x-user-id': modUser.id,
+        authorization: `Bearer ${token}`,
         'content-type': 'application/json',
       },
       body: JSON.stringify({

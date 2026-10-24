@@ -1,39 +1,30 @@
 'use client';
 
-import { UserProfile, UserRole } from '@/types/auth';
+import { UserProfile } from '@/types/auth';
 
-const AUTH_STORAGE_KEY = 'techradar_auth_session_v2';
-const USERS_DB_KEY = 'techradar_registered_users_v2';
-
-export const ADMIN_HANDLES = ['tanaythapar', 'sanvi850', 'panchadip125'];
+const AUTH_STORAGE_KEY = 'techradar_auth_session_v3';
+const AUTH_TOKEN_KEY = 'techradar_auth_token_v3';
 
 /**
- * Checks whether an identifier belongs to a whitelisted administrator.
- */
-export function isAdminIdentifier(identifier?: string | null): boolean {
-  if (!identifier) return false;
-  const clean = identifier.toLowerCase().trim().replace(/^@/, '');
-  return ADMIN_HANDLES.some(
-    h =>
-      clean === h ||
-      clean === `${h}@example.com` ||
-      clean === `${h}@radar.internal` ||
-      clean === `${h}@demo.radar` ||
-      clean === 'tanay.ggmu@gmail.com' ||
-      clean.startsWith(h)
-  );
-}
-
-/**
- * Checks whether Demo / Alpha Testing Mode is enabled.
- * Default enabled for Alpha testing so testers and admins can use the app without requiring Supabase.
- * Disabled only when explicitly set to NEXT_PUBLIC_DEMO_MODE=false.
+ * Checks whether Demo / Alpha Sandbox Mode is enabled.
+ * STRICT SECURITY:
+ * - NEVER active in production (fails closed).
+ * - Only active in non-production environments when NEXT_PUBLIC_DEMO_MODE=true.
  */
 export function isDemoMode(): boolean {
-  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEMO_MODE === 'false') {
+  if (process.env.NODE_ENV === 'production') {
     return false;
   }
-  return true;
+  return process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+}
+
+export function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export function getCurrentUser(): UserProfile | null {
@@ -47,24 +38,150 @@ export function getCurrentUser(): UserProfile | null {
 }
 
 /**
- * Logs in user locally for Demo / Alpha Testing.
- * Testers receive role 'user' (separated from admin tools).
- * Administrators (@TanayThapar) receive role 'admin'.
+ * Returns authorization headers for server API requests.
+ */
+export function getAuthHeaders(): Record<string, string> {
+  const token = getStoredToken();
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
+  }
+  return {};
+}
+
+/**
+ * Logs in user via server endpoint /api/auth/login.
+ * Returns verified UserProfile with cryptographic session token.
+ */
+export async function loginWithServer(
+  identifier: string,
+  password?: string,
+  name?: string
+): Promise<{ success: boolean; user?: UserProfile; token?: string; error?: string }> {
+  const clean = identifier.trim();
+  if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: clean, password, name }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success && data.user) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
+        if (data.token) {
+          localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+        }
+        window.dispatchEvent(new Event('techradar_auth_change'));
+      }
+      return { success: true, user: data.user, token: data.token };
+    }
+    return { success: false, error: data.error || 'Authentication failed' };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error during sign in' };
+  }
+}
+
+/**
+ * Registers a new account via /api/auth/signup.
+ */
+export async function signupWithServer(
+  name: string,
+  identifier: string,
+  password?: string
+): Promise<{ success: boolean; user?: UserProfile; token?: string; error?: string }> {
+  const cleanName = name.trim();
+  const clean = identifier.trim();
+  if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
+
+  try {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: cleanName, identifier: clean, password }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success && data.user) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
+        if (data.token) {
+          localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+        }
+        window.dispatchEvent(new Event('techradar_auth_change'));
+      }
+      return { success: true, user: data.user, token: data.token };
+    }
+    return { success: false, error: data.error || 'Registration failed' };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error during registration' };
+  }
+}
+
+/**
+ * Signs out user locally and invalidates session cookie on server.
+ */
+export async function logoutWithServer(): Promise<void> {
+  try {
+    await fetch('/api/auth/logout', { method: 'POST', headers: getAuthHeaders() });
+  } catch {
+    // Continue local cleanup even if offline
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    window.dispatchEvent(new Event('techradar_auth_change'));
+  }
+}
+
+/**
+ * Re-validates current session against server RBAC.
+ */
+export async function fetchCurrentUser(): Promise<UserProfile | null> {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: getAuthHeaders(),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.user) {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
+        return data.user;
+      }
+    } else if (res.status === 401) {
+      // Session expired or invalid
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      window.dispatchEvent(new Event('techradar_auth_change'));
+      return null;
+    }
+  } catch (err) {
+    console.warn('Failed to verify session with server:', err);
+  }
+  return getCurrentUser();
+}
+
+/**
+ * Legacy demo login helper maintained only for isolated unit tests.
+ * Note: Does not bypass server RBAC.
  */
 export function login(identifier: string): { success: boolean; user?: UserProfile; error?: string } {
   const clean = identifier.trim();
   if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
-
   const lowerClean = clean.toLowerCase().replace(/^@/, '');
-  const isAdmin = isAdminIdentifier(clean);
-  const email = clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@demo.radar`;
+  const isTanay = lowerClean === 'tanaythapar';
 
   const user: UserProfile = {
-    id: `usr-${isAdmin ? 'admin' : 'tester'}-${lowerClean}`,
-    email,
+    id: `usr-${isTanay ? 'admin' : 'user'}-${lowerClean}`,
+    email: clean.includes('@') ? clean.toLowerCase() : `${lowerClean}@demo.radar`,
     name: clean.replace(/^@/, ''),
     handle: lowerClean,
-    role: isAdmin ? 'admin' : 'user', // Testers get 'user', Admins get 'admin'
+    role: isTanay ? 'admin' : 'user',
     createdAt: new Date().toISOString(),
   };
 
@@ -74,83 +191,4 @@ export function login(identifier: string): { success: boolean; user?: UserProfil
   }
 
   return { success: true, user };
-}
-
-/**
- * Logs in user via server endpoint /api/auth/login or falls back gracefully in demo mode.
- */
-export async function loginWithServer(
-  identifier: string,
-  name?: string
-): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-  const clean = identifier.trim();
-  if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
-
-  try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: clean, name }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.user) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
-          window.dispatchEvent(new Event('techradar_auth_change'));
-        }
-        return { success: true, user: data.user };
-      }
-    }
-  } catch {
-    // If server is unreachable or offline, fallback to local demo auth
-  }
-
-  return login(clean);
-}
-
-/**
- * Re-validates current session against server RBAC.
- */
-export async function fetchCurrentUser(): Promise<UserProfile | null> {
-  if (typeof window === 'undefined') return null;
-  const cached = getCurrentUser();
-  if (!cached) return null;
-
-  try {
-    const headers: Record<string, string> = {};
-    if (cached.id) headers['x-user-id'] = cached.id;
-    if (cached.email) headers['x-user-email'] = cached.email;
-    if (cached.handle) headers['x-user-handle'] = cached.handle;
-
-    const res = await fetch('/api/auth/me', { headers });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.user) {
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
-        return data.user;
-      }
-    }
-  } catch (err) {
-    console.warn('Failed to verify session with server:', err);
-  }
-  return cached;
-}
-
-export function signup(name: string, identifier: string): { success: boolean; user?: UserProfile; error?: string } {
-  return login(identifier);
-}
-
-export async function signupWithServer(
-  name: string,
-  identifier: string
-): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-  return loginWithServer(identifier, name);
-}
-
-export function logout(): void {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    window.dispatchEvent(new Event('techradar_auth_change'));
-  }
 }

@@ -34,6 +34,7 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
     expect(data.user).toBeDefined();
     expect(data.user.handle.toLowerCase()).toBe('tanaythapar');
     expect(data.user.role).toBe('admin');
+    expect(data.token).toBeDefined();
   });
 
   it('assigns role "user" to a non-admin account upon login', async () => {
@@ -48,9 +49,10 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
 
     expect(data.success).toBe(true);
     expect(data.user.role).toBe('user');
+    expect(data.token).toBeDefined();
   });
 
-  it('verifies admin session via GET /api/auth/me', async () => {
+  it('verifies admin session via GET /api/auth/me with bearer token', async () => {
     // First login TanayThapar
     const loginReq = new Request('http://localhost:3000/api/auth/login', {
       method: 'POST',
@@ -59,13 +61,12 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
     });
     const loginRes = await loginPOST(loginReq);
     const loginData = await loginRes.json();
+    expect(loginData.token).toBeDefined();
 
-    // Now query /api/auth/me with user headers
+    // Query /api/auth/me with verified session token
     const meReq = new Request('http://localhost:3000/api/auth/me', {
       headers: {
-        'x-user-id': loginData.user.id,
-        'x-user-email': loginData.user.email,
-        'x-user-handle': loginData.user.handle,
+        authorization: `Bearer ${loginData.token}`,
       },
     });
 
@@ -74,5 +75,20 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
 
     expect(meData.success).toBe(true);
     expect(meData.user.role).toBe('admin');
+  });
+
+  it('rejects forged identity headers without valid session token', async () => {
+    const forgedReq = new Request('http://localhost:3000/api/auth/me', {
+      headers: {
+        'x-user-id': 'usr-tanaythapar',
+        'x-user-handle': 'TanayThapar',
+        'x-user-role': 'admin',
+      },
+    });
+
+    const res = await meGET(forgedReq);
+    expect(res.status).toBe(401);
+    const data = await res.json();
+    expect(data.success).toBe(false);
   });
 });

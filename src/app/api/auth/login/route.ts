@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getProfileByEmail, getProfileByHandle, saveProfile } from '@/lib/store';
-import { isBootstrapAdmin } from '@/lib/serverAuth';
+import {
+  isBootstrapAdmin,
+  hashPassword,
+  verifyPassword,
+  createSessionToken,
+} from '@/lib/serverAuth';
 import { UserProfile } from '@/types/auth';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const identifier = body.identifier?.trim();
+    const password = body.password ? String(body.password) : '';
     const name = body.name?.trim();
 
     if (!identifier) {
@@ -29,30 +35,61 @@ export async function POST(request: Request) {
     }
 
     if (profile) {
+      // If profile has a passwordHash and password is provided, verify it
+      if (profile.passwordHash && password) {
+        const matches = verifyPassword(password, profile.passwordHash);
+        if (!matches) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid password. Please check your credentials.' },
+            { status: 401 }
+          );
+        }
+      } else if (!profile.passwordHash && password) {
+        // First login with password sets it
+        profile.passwordHash = hashPassword(password);
+      }
+
       // Re-assert admin role if bootstrap admin
       if (isBootstrap && profile.role !== 'admin') {
         profile.role = 'admin';
-        profile = await saveProfile(profile);
       }
+      profile = await saveProfile(profile);
     } else {
-      // Provision profile with verified DB role
+      // Auto-provision bootstrap admin or new tester/user
+      const initialRole = isBootstrap ? 'admin' : 'user';
       profile = await saveProfile({
         id: `usr-${handle.toLowerCase()}`,
         email,
         name: name || handle,
         handle,
-        role: isBootstrap ? 'admin' : 'user',
+        role: initialRole,
         createdAt: new Date().toISOString(),
+        passwordHash: password ? hashPassword(password) : undefined,
       });
     }
 
-    const response = NextResponse.json({ success: true, user: profile });
-    // Set cookie for session persistence across navigation
-    response.cookies.set('radar_user_id', profile.id, {
+    // Generate verified cryptographic HMAC session token
+    const token = createSessionToken({
+      userId: profile.id,
+      email: profile.email,
+      handle: profile.handle,
+      role: profile.role,
+    });
+
+    const { passwordHash: _, ...sanitizedProfile } = profile;
+
+    const response = NextResponse.json({
+      success: true,
+      user: sanitizedProfile,
+      token,
+    });
+
+    // Set secure HTTP-only cookie for session persistence across navigation
+    response.cookies.set('radar_session', token, {
       path: '/',
-      httpOnly: false,
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 7, // 7 days
       sameSite: 'lax',
     });
 

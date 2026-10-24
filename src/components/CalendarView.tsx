@@ -48,12 +48,12 @@ interface CalendarViewProps {
 
 // Event pill height classes
 const TYPE_PILL: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-  hackathon: { bg: 'bg-purple-600/90', text: 'text-white', border: 'border-purple-400/40', dot: 'bg-purple-400' },
-  conference: { bg: 'bg-blue-600/90', text: 'text-white', border: 'border-blue-400/40', dot: 'bg-blue-400' },
-  job:        { bg: 'bg-indigo-600/90', text: 'text-white', border: 'border-indigo-400/40', dot: 'bg-indigo-400' },
-  workshop:   { bg: 'bg-emerald-600/90', text: 'text-white', border: 'border-emerald-400/40', dot: 'bg-emerald-400' },
-  internship: { bg: 'bg-amber-500/90', text: 'text-black font-bold', border: 'border-amber-400/40', dot: 'bg-amber-400' },
-  deadline:   { bg: 'bg-red-600/90', text: 'text-white', border: 'border-red-400/40', dot: 'bg-red-400' },
+  conference: { bg: 'bg-cyan-600/90', text: 'text-white font-medium', border: 'border-cyan-400/40', dot: 'bg-cyan-400' },
+  job:        { bg: 'bg-amber-600/90', text: 'text-white font-medium', border: 'border-amber-400/40', dot: 'bg-amber-400' },
+  hackathon:  { bg: 'bg-lime-500/90', text: 'text-slate-950 font-bold', border: 'border-lime-400/40', dot: 'bg-lime-400' },
+  workshop:   { bg: 'bg-purple-600/90', text: 'text-white font-medium', border: 'border-purple-400/40', dot: 'bg-purple-400' },
+  internship: { bg: 'bg-amber-500/90', text: 'text-slate-950 font-bold', border: 'border-amber-400/40', dot: 'bg-amber-400' },
+  deadline:   { bg: 'bg-rose-600/90', text: 'text-white font-medium', border: 'border-rose-400/40', dot: 'bg-rose-400' },
 };
 
 function getDaysUntil(dateStr: string): number {

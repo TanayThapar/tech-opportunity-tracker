@@ -1,20 +1,19 @@
 [
   {
-    "id": "run-1792859253659",
-    "timestamp": "2026-10-24T16:27:33.659Z",
+    "id": "run-1792867819690",
+    "timestamp": "2026-10-24T18:50:19.690Z",
     "status": "success",
-    "events_scanned": 2,
-    "events_added": 2,
-    "duplicates_skipped": 0,
+    "events_scanned": 1,
+    "events_added": 0,
+    "duplicates_skipped": 1,
     "events_archived": 0,
-    "low_confidence_count": 2,
+    "low_confidence_count": 0,
     "errors": [],
     "details": {
-      "added_titles": [
-        "Partial Event 1",
-        "Valid Conference 2027"
+      "added_titles": [],
+      "skipped_titles": [
+        "ICSE 2027: International Conference on Software Engineering (Matches: ICSE 2027: International Conference on Software Engineering)"
       ],
-      "skipped_titles": [],
       "updated_titles": []
     }
   }

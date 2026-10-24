@@ -8,18 +8,31 @@ import CalendarView from '@/components/CalendarView';
 import SubmitOpportunityModal from '@/components/SubmitOpportunityModal';
 import { TechOpportunity, OpportunityType, OpportunityFormat } from '@/types';
 import {
-  Calendar, LayoutList, AlertCircle, Compass,
-  Star, UserCheck, PlusCircle, Terminal, RefreshCw
+  Calendar,
+  LayoutList,
+  AlertCircle,
+  Compass,
+  Star,
+  UserCheck,
+  PlusCircle,
+  RefreshCw,
+  Clock,
+  Sparkles,
+  Radio,
+  ExternalLink,
+  Bookmark,
+  CheckCircle2,
+  ChevronRight,
+  Filter,
 } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'motion/react';
 import { getAllInteractions } from '@/lib/interactions';
-import { format } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
 
 export default function HomePage() {
   const [opportunities, setOpportunities] = useState<TechOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedType, setSelectedType] = useState<OpportunityType | 'all'>('all');
   const [selectedTier, setSelectedTier] = useState<string | 'all'>('all');
   const [selectedFormat, setSelectedFormat] = useState<OpportunityFormat | 'all'>('all');
@@ -31,12 +44,11 @@ export default function HomePage() {
   const [pipelineToast, setPipelineToast] = useState<string | null>(null);
   const [interactionVersion, setInteractionVersion] = useState(0);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
 
-  const fetchOpportunities = async (isBackground = false) => {
+  const fetchOpportunities = async () => {
     try {
-      if (!isBackground) setLoading(true);
+      setLoading(true);
       const res = await fetch('/api/opportunities?status=published');
       const json = await res.json();
       if (json.success) {
@@ -46,21 +58,16 @@ export default function HomePage() {
     } catch (err) {
       console.error('Failed to fetch opportunities:', err);
     } finally {
-      if (!isBackground) setLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchOpportunities();
-    // Auto-refresh upcoming opportunities every 60 seconds
-    const interval = setInterval(() => {
-      fetchOpportunities(true);
-    }, 60000);
 
     const handleInteractionChange = () => setInteractionVersion(v => v + 1);
     window.addEventListener('techradar_interaction_change', handleInteractionChange);
     return () => {
-      clearInterval(interval);
       window.removeEventListener('techradar_interaction_change', handleInteractionChange);
     };
   }, []);
@@ -68,14 +75,14 @@ export default function HomePage() {
   const handleTriggerPipeline = async () => {
     try {
       setIsRunningPipeline(true);
-      setPipelineToast('Running discovery pipeline...');
+      setPipelineToast('Syncing opportunity feeds via source adapters...');
       const res = await fetch('/api/pipeline/run', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        setPipelineToast(data.message || 'Discovery run finished!');
+        setPipelineToast(data.message || 'Discovery run finished successfully.');
         await fetchOpportunities();
       } else {
-        setPipelineToast('Pipeline failed: ' + data.error);
+        setPipelineToast('Pipeline notice: ' + data.error);
       }
     } catch (err: any) {
       setPipelineToast('Pipeline error: ' + err.message);
@@ -85,25 +92,11 @@ export default function HomePage() {
     }
   };
 
-  const handleUpdateConfidence = async (id: string, newConfidence: 'high' | 'low') => {
-    try {
-      const res = await fetch('/api/opportunities', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, discovery_confidence: newConfidence }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setOpportunities(prev => prev.map(o => o.id === id ? { ...o, discovery_confidence: newConfidence } : o));
-      }
-    } catch (err) {
-      console.error('Failed updating confidence:', err);
-    }
-  };
-
   const tierList = useMemo(() => {
     const set = new Set<string>();
-    opportunities.forEach(o => { if (o.conference_tier) set.add(o.conference_tier); });
+    opportunities.forEach(o => {
+      if (o.conference_tier) set.add(o.conference_tier);
+    });
     ['Core A*', 'Core A', 'Core B', 'Core C'].forEach(t => set.add(t));
     return Array.from(set);
   }, [opportunities]);
@@ -115,6 +108,31 @@ export default function HomePage() {
       if (comp) set.add(comp);
     });
     return Array.from(set).sort();
+  }, [opportunities]);
+
+  // Closing soon calculations (deadlines approaching within 45 days)
+  const closingSoonItems = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return opportunities
+      .filter(item => {
+        const deadlineStr = item.submission_deadline || item.application_deadline || item.start_date;
+        if (!deadlineStr) return false;
+        try {
+          const d = parseISO(deadlineStr);
+          const diff = differenceInDays(d, today);
+          return diff >= 0 && diff <= 45;
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => {
+        const dA = a.submission_deadline || a.application_deadline || a.start_date;
+        const dB = b.submission_deadline || b.application_deadline || b.start_date;
+        return (dA || '').localeCompare(dB || '');
+      })
+      .slice(0, 4);
   }, [opportunities]);
 
   const filtered = useMemo(() => {
@@ -137,29 +155,45 @@ export default function HomePage() {
         const matchesCompany = (item.company || '').toLowerCase().includes(q);
         const matchesDesc = item.description.toLowerCase().includes(q);
         const matchesTier = item.conference_tier?.toLowerCase().includes(q);
-        if (!matchesTitle && !matchesOrg && !matchesCompany && !matchesDesc && !matchesTier) return false;
+        const matchesLocation = (item.location || '').toLowerCase().includes(q);
+        if (!matchesTitle && !matchesOrg && !matchesCompany && !matchesDesc && !matchesTier && !matchesLocation) {
+          return false;
+        }
       }
       return true;
     });
-  }, [opportunities, selectedType, selectedTier, selectedFormat, selectedCompany, searchQuery, onlyStarred, onlyAttending, interactionVersion]);
+  }, [
+    opportunities,
+    selectedType,
+    selectedTier,
+    selectedFormat,
+    selectedCompany,
+    searchQuery,
+    onlyStarred,
+    onlyAttending,
+    interactionVersion,
+  ]);
 
-  const lowConfidenceCount = useMemo(
-    () => opportunities.filter(o => o.discovery_confidence === 'low').length,
-    [opportunities]
-  );
+  const stats = useMemo(() => {
+    const counts = { conference: 0, job: 0, hackathon: 0, workshop: 0, internship: 0 };
+    opportunities.forEach(o => {
+      if (counts[o.type] !== undefined) counts[o.type]++;
+    });
+    return counts;
+  }, [opportunities]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 flex flex-col">
+    <div className="min-h-screen bg-[#0c1015] text-[#e6edf3] font-sans flex flex-col selection:bg-lime-400 selection:text-slate-950">
       <Navbar
         onTriggerPipeline={handleTriggerPipeline}
         isRunningPipeline={isRunningPipeline}
         opportunities={opportunities}
       />
 
-      {/* Toast */}
+      {/* Toast Notification */}
       {pipelineToast && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-md p-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 rounded-xl shadow-lg flex items-center gap-3 text-xs">
-          <Terminal className="w-4 h-4 text-blue-500 flex-shrink-0" />
+        <div className="fixed bottom-5 right-5 z-50 max-w-md p-3.5 bg-[#111620] border border-slate-700 text-slate-200 rounded-xl shadow-2xl flex items-center gap-3 text-xs">
+          <Radio className="w-4 h-4 text-lime-400 flex-shrink-0" />
           <p>{pipelineToast}</p>
         </div>
       )}
@@ -170,114 +204,172 @@ export default function HomePage() {
         onSubmitted={fetchOpportunities}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-5">
-        {/* Page header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+        {/* Top Control Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800">
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
-                <Calendar className="w-6 h-6 text-blue-600" />
-                <span>Tech Opportunity Tracker</span>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <span>Opportunity Radar</span>
               </h1>
-              <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-600 text-emerald-700 dark:text-emerald-400 text-[10px] font-mono">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>LIVE SYNC</span>
-              </div>
+              <span className="px-2 py-0.5 rounded-full bg-lime-400/10 border border-lime-400/20 text-lime-400 text-[11px] font-mono font-medium">
+                LIVE
+              </span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              {opportunities.length} live opportunities · Hackathons, Conferences, Jobs, Workshops & Internships
+            <p className="text-xs text-slate-400 mt-1">
+              Verified computer science conferences, engineering requisitions, hackathons, and research deadlines.
               {lastRefreshedAt && (
-                <span className="text-gray-400 dark:text-gray-500">
-                  {' '}· Updated {format(lastRefreshedAt, 'h:mm a')}
-                </span>
+                <span className="text-slate-500 font-mono"> · Refreshed {format(lastRefreshedAt, 'HH:mm')}</span>
               )}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Refresh Opportunities */}
+            {/* Manual Refresh */}
             <button
-              onClick={() => fetchOpportunities(false)}
+              onClick={fetchOpportunities}
               disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50"
-              title="Refresh upcoming opportunities feed"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+              title="Refresh radar opportunities"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-blue-500 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-lime-400 ${loading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
 
-            {/* Add Event */}
-            <button
-              onClick={() => setIsSubmitModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-sm cursor-pointer"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              Add Event
-            </button>
-
-            {/* Starred filter */}
+            {/* Saved Watchlist Filter */}
             <button
               onClick={() => setOnlyStarred(!onlyStarred)}
-              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all border ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border cursor-pointer ${
                 onlyStarred
-                  ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/30 dark:border-amber-600 dark:text-amber-300'
-                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-amber-300'
+                  ? 'bg-amber-400/15 border-amber-400/60 text-amber-300'
+                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
               }`}
             >
-              <Star className={`w-3.5 h-3.5 ${onlyStarred ? 'fill-amber-500 text-amber-500' : ''}`} />
-              Starred
+              <Bookmark className={`w-3.5 h-3.5 ${onlyStarred ? 'fill-amber-400 text-amber-400' : ''}`} />
+              <span>Watchlist</span>
             </button>
 
-            {/* Attending filter */}
+            {/* Attending Filter */}
             <button
               onClick={() => setOnlyAttending(!onlyAttending)}
-              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all border ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border cursor-pointer ${
                 onlyAttending
-                  ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-600 dark:text-blue-300'
-                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-blue-300'
+                  ? 'bg-lime-400/15 border-lime-400/60 text-lime-300'
+                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
               }`}
             >
               <UserCheck className="w-3.5 h-3.5" />
-              Attending
+              <span>Attending</span>
             </button>
 
-            {lowConfidenceCount > 0 && (
-              <Link
-                href="/needs-review"
-                className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-400 text-xs font-medium hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-              >
-                <AlertCircle className="w-3.5 h-3.5" />
-                Review ({lowConfidenceCount})
-              </Link>
-            )}
+            {/* Submit Event */}
+            <button
+              onClick={() => setIsSubmitModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5 text-lime-400" />
+              <span>Submit Listing</span>
+            </button>
 
-            {/* View switcher */}
-            <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-              <button
-                onClick={() => setViewMode('calendar')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  viewMode === 'calendar'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                Calendar
-              </button>
+            {/* View switcher: Cards List vs Calendar */}
+            <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-700">
               <button
                 onClick={() => setViewMode('list')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
                   viewMode === 'list'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-lime-400 text-slate-950 font-bold'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <LayoutList className="w-3.5 h-3.5" />
-                Feed
+                <span>Cards</span>
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer ${
+                  viewMode === 'calendar'
+                    ? 'bg-lime-400 text-slate-950 font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Calendar</span>
               </button>
             </div>
           </div>
         </div>
+
+        {/* ── LEAD SECTION: "Closing Soon" Urgent Deadlines ────────────────── */}
+        {closingSoonItems.length > 0 && !onlyStarred && !onlyAttending && searchQuery === '' && (
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Closing Soon // Upcoming Deadlines
+                </h2>
+              </div>
+              <span className="text-[11px] font-mono text-slate-500">Next 45 days</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {closingSoonItems.map(item => {
+                const deadline = item.submission_deadline || item.application_deadline || item.start_date;
+                const daysLeft = deadline ? differenceInDays(parseISO(deadline), new Date()) : 999;
+                const isConference = item.type === 'conference';
+                const isJob = item.type === 'job';
+
+                return (
+                  <div
+                    key={item.id}
+                    className="p-3.5 rounded-xl bg-[#111620] border border-amber-500/30 hover:border-amber-400/60 transition-all flex flex-col justify-between space-y-2 shadow-sm"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 text-[10px] font-mono mb-1.5">
+                        <span
+                          className={`font-bold px-1.5 py-0.5 rounded uppercase ${
+                            isConference
+                              ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/30'
+                              : isJob
+                              ? 'bg-amber-950 text-amber-300 border border-amber-500/30'
+                              : 'bg-lime-950 text-lime-300 border border-lime-500/30'
+                          }`}
+                        >
+                          {item.type}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded font-bold bg-amber-400 text-slate-950 font-mono">
+                          {daysLeft === 0 ? 'TODAY' : daysLeft === 1 ? '1 DAY LEFT' : `${daysLeft}d left`}
+                        </span>
+                      </div>
+
+                      <h3 className="font-semibold text-xs text-white line-clamp-2 leading-snug">
+                        {item.title}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 truncate mt-1">
+                        {item.company || item.organizer}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] font-mono">
+                      <span className="text-slate-400">
+                        {deadline ? deadline.slice(0, 10) : 'Rolling'}
+                      </span>
+                      <a
+                        href={item.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-lime-400 hover:text-lime-300 font-medium inline-flex items-center gap-1"
+                      >
+                        <span>Source</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Filter Bar */}
         <FilterBar
@@ -295,32 +387,33 @@ export default function HomePage() {
           companyList={companyList}
         />
 
-        {/* Content */}
+        {/* Main Content Area */}
         {loading ? (
-          <div className="py-24 flex flex-col items-center justify-center text-gray-400 text-xs gap-3">
-            <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <span>Loading opportunities...</span>
+          <div className="py-20 flex flex-col items-center justify-center text-slate-400 text-xs gap-3">
+            <div className="w-8 h-8 border-2 border-lime-400 border-t-transparent rounded-full animate-spin" />
+            <span className="font-mono">Loading verified listings...</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 space-y-3 shadow-sm">
-            <Compass className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600" />
-            <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300">No opportunities found</h3>
-            <p className="text-xs text-gray-500 max-w-md mx-auto">
-              Submit a real live opportunity or run the automated discovery crawler to populate the calendar.
+          <div className="py-16 text-center bg-[#111620] rounded-xl border border-slate-800 p-8 space-y-3">
+            <Compass className="w-10 h-10 mx-auto text-slate-600" />
+            <h3 className="text-sm font-bold text-white">No opportunities match the selected filters</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Try adjusting your category, work mode, or search terms, or trigger a discovery crawl.
             </p>
-            <div className="pt-2 flex justify-center gap-3">
+            <div className="pt-2 flex justify-center gap-2">
               <button
-                onClick={() => setIsSubmitModalOpen(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl transition-colors flex items-center gap-1.5 shadow-sm"
+                onClick={() => {
+                  setSelectedType('all');
+                  setSelectedTier('all');
+                  setSelectedFormat('all');
+                  setSelectedCompany('all');
+                  setSearchQuery('');
+                  setOnlyStarred(false);
+                  setOnlyAttending(false);
+                }}
+                className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
               >
-                <PlusCircle className="w-3.5 h-3.5" />
-                Add First Event
-              </button>
-              <button
-                onClick={handleTriggerPipeline}
-                className="px-4 py-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs rounded-xl border border-gray-200 dark:border-gray-700 transition-colors"
-              >
-                Run Discovery Pipeline
+                Reset All Filters
               </button>
             </div>
           </div>
@@ -332,27 +425,24 @@ export default function HomePage() {
               <OpportunityCard
                 key={item.id}
                 opportunity={item}
-                onUpdateConfidence={handleUpdateConfidence}
-                showReviewActions={true}
               />
             ))}
           </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-200 dark:border-gray-700/60 py-4 text-xs text-gray-500 dark:text-gray-500 bg-white dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>
-            <span className="font-semibold text-gray-700 dark:text-gray-300">TechRadar</span> v2.0 · Conferences, Hackathons, Internships & Workshops
-          </p>
-          <div className="flex items-center gap-4">
-            <Link href="/needs-review" className="hover:text-gray-700 dark:hover:text-gray-300">
-              Needs Review ({lowConfidenceCount})
-            </Link>
-            <Link href="/pipeline-logs" className="hover:text-gray-700 dark:hover:text-gray-300">
-              Pipeline Logs
-            </Link>
+      {/* Polished Footer */}
+      <footer className="border-t border-slate-800/80 py-5 text-xs text-slate-500 bg-[#0c1015] mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-300">Opportunity Radar</span>
+            <span>·</span>
+            <span>All listings derived from real source adapters at runtime.</span>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] font-mono text-slate-400">
+            <span>Conferences: {stats.conference}</span>
+            <span>Jobs: {stats.job}</span>
+            <span>Hackathons: {stats.hackathon}</span>
           </div>
         </div>
       </footer>

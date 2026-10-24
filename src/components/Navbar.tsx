@@ -15,14 +15,13 @@ import {
   X,
   ExternalLink,
   Clock,
-  Briefcase,
-  AlertTriangle,
+  Radio,
+  ShieldAlert,
 } from 'lucide-react';
-import { getCurrentUser, logout, isDemoMode, fetchCurrentUser } from '@/lib/auth';
+import { getCurrentUser, logoutWithServer, isDemoMode, fetchCurrentUser } from '@/lib/auth';
 import { UserProfile } from '@/types/auth';
 import { TechOpportunity } from '@/types';
 import { getApproachingReminders, getReminderLabel, getReminderTypeLabel, ReminderAlert } from '@/lib/reminders';
-import { format, parseISO } from 'date-fns';
 
 interface NavbarProps {
   onTriggerPipeline?: () => void;
@@ -65,8 +64,8 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
     return () => window.removeEventListener('techradar_interaction_change', update);
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logoutWithServer();
     router.push('/login');
   };
 
@@ -80,23 +79,25 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
   return (
     <>
       {inDemo && (
-        <div className="bg-amber-950/90 border-b border-amber-500/50 text-amber-200 text-xs py-1 px-4 text-center font-mono flex items-center justify-center gap-2">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-          <span>LOCAL DEMO MODE (Read-only sandbox, no server/production database access)</span>
+        <div className="bg-amber-950/70 border-b border-amber-500/30 text-amber-300 text-[11px] py-1 px-4 text-center font-mono flex items-center justify-center gap-2">
+          <span>// LOCAL DEMO ENVIRONMENT // Isolated test data</span>
         </div>
       )}
-      <header className="sticky top-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <header className="sticky top-0 z-50 bg-[#0c1015]/95 backdrop-blur-md border-b border-slate-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             {/* Brand */}
             <div className="flex items-center space-x-3">
-              <Link href="/" className="flex items-center space-x-2 group">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center shadow-sm">
-                  <Calendar className="w-4 h-4 text-white" />
+              <Link href="/" className="flex items-center space-x-2.5 group">
+                <div className="w-8 h-8 rounded-lg bg-lime-400 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-lime-950/40">
+                  <Radio className="w-4 h-4" />
                 </div>
-                <span className="font-bold text-gray-900 dark:text-white text-sm hidden sm:block">
-                  TechRadar
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-bold text-white text-sm tracking-tight flex items-center gap-1.5">
+                    RADAR
+                    <span className="text-[10px] font-mono px-1 py-0.2 bg-slate-800 text-slate-300 rounded">v2.5</span>
+                  </span>
+                </div>
               </Link>
             </div>
 
@@ -106,25 +107,26 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
                 href="/"
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
                   pathname === '/'
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                    ? 'bg-lime-400/10 text-lime-400 border border-lime-400/20'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
-                <span>Calendar</span>
+                <span>Radar</span>
               </Link>
 
+              {/* Privileged navigation: strictly hidden unless user has moderator or admin role */}
               {isModeratorOrAdmin && (
                 <Link
                   href="/needs-review"
                   className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
                     pathname === '/needs-review'
-                      ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'bg-amber-400/10 text-amber-400 border border-amber-400/20'
+                      : 'text-slate-300 hover:text-amber-400 hover:bg-slate-800/60'
                   }`}
                 >
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Review</span>
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Review Queue</span>
                 </Link>
               )}
 
@@ -133,8 +135,8 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
                   href="/pipeline-logs"
                   className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
                     pathname === '/pipeline-logs'
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'bg-cyan-400/10 text-cyan-400 border border-cyan-400/20'
+                      : 'text-slate-300 hover:text-cyan-400 hover:bg-slate-800/60'
                   }`}
                 >
                   <History className="w-3.5 h-3.5" />
@@ -147,8 +149,8 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
                   href="/admin"
                   className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-colors font-medium ${
                     pathname === '/admin'
-                      ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'bg-purple-400/10 text-purple-400 border border-purple-400/20'
+                      : 'text-slate-300 hover:text-purple-400 hover:bg-slate-800/60'
                   }`}
                 >
                   <Shield className="w-3.5 h-3.5" />
@@ -157,7 +159,7 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
               )}
             </nav>
 
-            {/* Right side: Pipeline, Reminders, User */}
+            {/* Right side: Pipeline trigger, Reminders, User */}
             <div className="flex items-center gap-2">
               {/* Run Pipeline (Admin only) */}
               {isAdmin && onTriggerPipeline && (
@@ -165,10 +167,10 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
                   onClick={onTriggerPipeline}
                   disabled={isRunningPipeline}
                   title="Run discovery pipeline"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRunningPipeline ? 'animate-spin' : ''}`} />
-                  <span className="hidden lg:inline">{isRunningPipeline ? 'Running...' : 'Refresh'}</span>
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRunningPipeline ? 'animate-spin text-lime-400' : ''}`} />
+                  <span className="hidden lg:inline">{isRunningPipeline ? 'Syncing...' : 'Crawl'}</span>
                 </button>
               )}
 
@@ -176,17 +178,17 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
               <div className="relative">
                 <button
                   onClick={() => setShowReminderTray(!showReminderTray)}
-                  className={`relative p-2 rounded-lg transition-colors ${
+                  className={`relative p-2 rounded-lg transition-colors cursor-pointer ${
                     totalCount > 0
-                      ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/30 hover:bg-orange-100 dark:hover:bg-orange-900/40'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'text-amber-400 bg-amber-950/40 border border-amber-500/30 hover:bg-amber-900/40'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                   }`}
                   title="Upcoming reminders"
                 >
                   <Bell className="w-4 h-4" />
                   {totalCount > 0 && (
-                    <span className={`absolute -top-0.5 -right-0.5 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-black text-white
-                      ${criticalCount > 0 ? 'bg-red-500 animate-pulse' : 'bg-orange-500'}`}>
+                    <span className={`absolute -top-0.5 -right-0.5 w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-mono font-bold text-slate-950
+                      ${criticalCount > 0 ? 'bg-rose-400 animate-pulse' : 'bg-amber-400'}`}>
                       {totalCount}
                     </span>
                   )}
@@ -194,39 +196,42 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
 
                 {/* Reminder Tray Dropdown */}
                 {showReminderTray && (
-                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-[#111620] rounded-xl shadow-2xl border border-slate-800 z-50 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-[#0c1015]">
                       <div className="flex items-center gap-2">
-                        <Bell className="w-4 h-4 text-orange-500" />
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white">Upcoming Reminders</span>
+                        <Bell className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">Upcoming Deadlines</span>
                       </div>
-                      <button onClick={() => setShowReminderTray(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <X className="w-3.5 h-3.5 text-gray-400" />
+                      <button
+                        onClick={() => setShowReminderTray(false)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
                     {reminders.length === 0 ? (
-                      <div className="p-6 text-center">
-                        <Bell className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">No upcoming reminders</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                          Mark events as &quot;Attending&quot; or enable reminders on events you&apos;re tracking.
+                      <div className="p-6 text-center space-y-1">
+                        <Bell className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                        <p className="text-xs text-white font-medium">No urgent deadlines approaching</p>
+                        <p className="text-[11px] text-slate-400">
+                          Save opportunities or mark as attending to receive countdown alerts.
                         </p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-gray-100 dark:divide-gray-700/60 max-h-[400px] overflow-y-auto">
+                      <div className="divide-y divide-slate-800 max-h-[400px] overflow-y-auto">
                         {reminders.map((alert, i) => (
-                          <div key={i} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                          <div key={i} className="p-3 hover:bg-slate-800/40 transition-colors">
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300">
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-950 text-amber-300 border border-amber-500/30">
                                   {getReminderTypeLabel(alert.type)}
                                 </span>
-                                <h4 className="text-xs font-semibold text-gray-900 dark:text-white mt-1 line-clamp-1">
+                                <h4 className="text-xs font-semibold text-white mt-1 line-clamp-1">
                                   {alert.eventTitle}
                                 </h4>
-                                <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                                  <Clock className="w-3 h-3 text-orange-500" />
+                                <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-400 mt-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />
                                   <span>{getReminderLabel(alert)}</span>
                                 </div>
                               </div>
@@ -234,7 +239,7 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
                                 href={alert.sourceUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-gray-400 hover:text-blue-500 p-1"
+                                className="text-slate-400 hover:text-lime-400 p-1"
                               >
                                 <ExternalLink className="w-3.5 h-3.5" />
                               </a>
@@ -249,26 +254,24 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
 
               {/* User profile / login */}
               {user ? (
-                <div className="flex items-center gap-2 pl-2 border-l border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2.5 pl-2 border-l border-slate-800">
                   <div className="hidden sm:block text-right">
-                    <div className="text-xs font-semibold text-gray-900 dark:text-white truncate max-w-[120px]">
+                    <div className="text-xs font-semibold text-white truncate max-w-[120px]">
                       {user.name}
                     </div>
-                    <div className="text-[10px] uppercase tracking-wider pt-0.5">
+                    <div className="text-[10px] font-mono uppercase tracking-wider">
                       {user.role === 'admin' ? (
-                        <span className="px-1.5 py-0.5 rounded bg-purple-950 border border-purple-500/60 text-purple-300 font-bold text-[9px]">
-                          ADMIN
-                        </span>
+                        <span className="text-purple-400 font-bold">ADMIN</span>
+                      ) : user.role === 'moderator' ? (
+                        <span className="text-amber-400 font-bold">MODERATOR</span>
                       ) : (
-                        <span className="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-500/60 text-emerald-300 font-bold text-[9px]">
-                          ALPHA TESTER
-                        </span>
+                        <span className="text-slate-400">RESEARCHER</span>
                       )}
                     </div>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="p-1.5 rounded-lg text-gray-500 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition-colors cursor-pointer"
                     title="Sign out"
                   >
                     <LogOut className="w-3.5 h-3.5" />
@@ -277,7 +280,7 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
               ) : (
                 <Link
                   href="/login"
-                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-lime-400 hover:bg-lime-300 text-slate-950 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors shadow-sm"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>Sign In</span>
