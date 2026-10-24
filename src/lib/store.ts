@@ -29,6 +29,7 @@ function ensureDataDir() {
 }
 
 // Global in-memory cache to guarantee fast and synchronous isolation in unit tests
+let isTestStoreActive = false;
 let memoryOpportunities: TechOpportunity[] | null = null;
 let memoryLogs: PipelineRunLog[] = [];
 let memoryProfiles: Map<string, UserProfile> = new Map();
@@ -91,16 +92,16 @@ export async function getOpportunities(filter?: {
   }
 
   // Fallback to memory / file store
-  if (memoryOpportunities === null) {
+  if (!isTestStoreActive && (memoryOpportunities === null || !memoryOpportunities.some(o => o.status === 'published'))) {
     ensureDataDir();
     if (fs.existsSync(EVENTS_FILE)) {
       try {
         const raw = fs.readFileSync(EVENTS_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed) && parsed.some((o: any) => o.status === 'published')) {
           memoryOpportunities = parsed;
         } else {
-          memoryOpportunities = [...SEED_OPPORTUNITIES];
+          memoryOpportunities = [...SEED_OPPORTUNITIES, ...(Array.isArray(parsed) ? parsed : [])];
         }
       } catch {
         memoryOpportunities = [...SEED_OPPORTUNITIES];
@@ -108,6 +109,8 @@ export async function getOpportunities(filter?: {
     } else {
       memoryOpportunities = [...SEED_OPPORTUNITIES];
     }
+  } else if (memoryOpportunities === null) {
+    memoryOpportunities = [];
   }
 
   let list = [...(memoryOpportunities || [])];
@@ -579,6 +582,7 @@ export async function recordNotification(
 
 // Reset memory store helper for unit test isolation
 export function _resetMemoryStoreForTests(): void {
+  isTestStoreActive = true;
   memoryOpportunities = [];
   memoryLogs = [];
   memoryProfiles.clear();
