@@ -98,10 +98,12 @@ export async function getOpportunities(filter?: {
       try {
         const raw = fs.readFileSync(EVENTS_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.some((o: any) => o.status === 'published')) {
+        if (Array.isArray(parsed) && parsed.length >= SEED_OPPORTUNITIES.length) {
           memoryOpportunities = parsed;
         } else {
-          memoryOpportunities = [...SEED_OPPORTUNITIES, ...(Array.isArray(parsed) ? parsed : [])];
+          const existingIds = new Set(Array.isArray(parsed) ? parsed.map((p: any) => p.id) : []);
+          const missingSeeds = SEED_OPPORTUNITIES.filter(s => !existingIds.has(s.id));
+          memoryOpportunities = [...(Array.isArray(parsed) ? parsed : []), ...missingSeeds];
         }
       } catch {
         memoryOpportunities = [...SEED_OPPORTUNITIES];
