@@ -23,6 +23,8 @@ import {
   UserCog,
   Briefcase,
   ArrowLeft,
+  Users,
+  ShieldQuestion,
 } from 'lucide-react';
 import Link from 'next/link';
 import { getAllInteractions } from '@/lib/interactions';
@@ -31,12 +33,26 @@ export default function AdminAnalyticsDashboard() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [opportunities, setOpportunities] = useState<TechOpportunity[]>([]);
   const [logs, setLogs] = useState<PipelineRunLog[]>([]);
+  const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Role management state
   const [targetUserId, setTargetUserId] = useState('');
   const [targetRole, setTargetRole] = useState<UserRole>('moderator');
   const [roleMessage, setRoleMessage] = useState<string | null>(null);
+  const [customInputMode, setCustomInputMode] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/roles', { headers: getAuthHeaders() });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setUsersList(json.data);
+      }
+    } catch (err) {
+      console.warn('Failed to load users list:', err);
+    }
+  };
 
   useEffect(() => {
     const verifyAndFetch = async () => {
@@ -51,15 +67,20 @@ export default function AdminAnalyticsDashboard() {
 
         if (u?.role === 'admin') {
           const authHeaders = getAuthHeaders();
-          const [oppsRes, logsRes] = await Promise.all([
+          const [oppsRes, logsRes, usersRes] = await Promise.all([
             fetch('/api/opportunities?status=published', { headers: authHeaders }),
             fetch('/api/pipeline/logs', { headers: authHeaders }),
+            fetch('/api/admin/roles', { headers: authHeaders }),
           ]);
           const oppsJson = await oppsRes.json();
           const logsJson = await logsRes.json();
+          const usersJson = await usersRes.json();
 
           if (oppsJson.success) setOpportunities(oppsJson.data);
           if (logsJson.success) setLogs(logsJson.data);
+          if (usersJson.success && Array.isArray(usersJson.data)) {
+            setUsersList(usersJson.data);
+          }
         }
       } catch (err) {
         console.error('Failed loading admin data:', err);
@@ -71,9 +92,29 @@ export default function AdminAnalyticsDashboard() {
     verifyAndFetch();
   }, []);
 
+  const selectedProfile = useMemo(() => {
+    return usersList.find(u => u.id === targetUserId || u.email === targetUserId || u.handle === targetUserId);
+  }, [usersList, targetUserId]);
+
+  const isSelectedRootAdmin = useMemo(() => {
+    if (!selectedProfile && !targetUserId) return false;
+    const identifier = (selectedProfile?.handle || selectedProfile?.email || targetUserId).toLowerCase().trim();
+    return (
+      identifier === 'tanaythapar' ||
+      identifier === 'sanvi850' ||
+      identifier.startsWith('tanaythapar@') ||
+      identifier.startsWith('sanvi850@')
+    );
+  }, [selectedProfile, targetUserId]);
+
   const handleUpdateRole = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetUserId.trim()) return;
+
+    if (isSelectedRootAdmin) {
+      setRoleMessage('Error: TanayThapar and Sanvi850 have the highest level of administrative access locked in source code and cannot be modified.');
+      return;
+    }
 
     try {
       const res = await fetch('/api/admin/roles', {
@@ -86,8 +127,8 @@ export default function AdminAnalyticsDashboard() {
       });
       const data = await res.json();
       if (data.success) {
-        setRoleMessage(`Success: User ${targetUserId} updated to role "${targetRole}"`);
-        setTargetUserId('');
+        setRoleMessage(`Success: Role for user "${targetUserId}" updated to "${targetRole}"`);
+        await fetchUsers();
         setTimeout(() => setRoleMessage(null), 4000);
       } else {
         setRoleMessage(`Error: ${data.error || 'Failed to update user role'}`);
@@ -192,14 +233,14 @@ export default function AdminAnalyticsDashboard() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg sm:text-xl font-bold text-white">
-                    Administrator Controls & Pipeline Analytics
+                    Administrator Controls & Role Management
                   </h1>
                   <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-lime-950 text-lime-300 border border-lime-500/40">
-                    SERVER_ENFORCED
+                    HIGHEST ACCESS
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Server-verified admin session for @{user.handle}. Manage user roles, review pipeline logs, and monitor ingestion rates.
+                  Active session: <span className="text-white font-semibold">@{user.handle}</span>. Root administrators TanayThapar and Sanvi850 are locked in source code.
                 </p>
               </div>
             </div>
@@ -223,52 +264,188 @@ export default function AdminAnalyticsDashboard() {
           </div>
         </div>
 
-        {/* Role Management Tool */}
-        <div className="p-5 rounded-xl bg-[#111620] border border-slate-800 shadow-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <UserCog className="w-4 h-4 text-lime-400" />
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-              Role-Based Access Management
-            </h2>
-          </div>
-          <p className="text-xs text-slate-400 mb-3">
-            Promote or demote users in the database. Role updates are server-enforced and logged to audit records.
-          </p>
+        {/* Role-Based Access Management Tool with Dropdown Menu */}
+        <div className="p-5 rounded-xl bg-[#111620] border border-slate-800 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <UserCog className="w-5 h-5 text-lime-400" />
+              <div>
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Role-Based Access Management
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Select any registered user from the dropdown menu to assign roles (user, moderator, admin).
+                </p>
+              </div>
+            </div>
 
-          <form onSubmit={handleUpdateRole} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-            <div className="sm:col-span-6">
-              <input
-                type="text"
-                placeholder="User ID or Email (e.g. user@example.com)"
-                value={targetUserId}
-                onChange={e => setTargetUserId(e.target.value)}
-                className="w-full bg-[#0c1015] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400 font-mono"
-              />
+            <button
+              type="button"
+              onClick={() => setCustomInputMode(!customInputMode)}
+              className="text-xs text-slate-400 hover:text-lime-400 transition-colors self-start sm:self-auto cursor-pointer"
+            >
+              {customInputMode ? '← Use Dropdown Menu' : 'Type Custom ID / Email →'}
+            </button>
+          </div>
+
+          <form onSubmit={handleUpdateRole} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+              {/* User Selection: Dropdown Menu or Manual Input */}
+              <div className="sm:col-span-6 space-y-1">
+                <label className="block text-xs font-semibold text-slate-300">
+                  {customInputMode ? 'User ID or Email' : 'Select User from Dropdown Menu'}
+                </label>
+
+                {customInputMode ? (
+                  <input
+                    type="text"
+                    placeholder="User ID or Email (e.g. user@example.com)"
+                    value={targetUserId}
+                    onChange={e => setTargetUserId(e.target.value)}
+                    className="w-full bg-[#0c1015] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400 font-mono"
+                  />
+                ) : (
+                  <select
+                    value={targetUserId}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setTargetUserId(val);
+                      const found = usersList.find(u => u.id === val || u.handle === val || u.email === val);
+                      if (found) {
+                        setTargetRole(found.role);
+                      }
+                    }}
+                    className="w-full bg-[#0c1015] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400 cursor-pointer"
+                  >
+                    <option value="">-- Choose a registered user from dropdown --</option>
+                    {usersList.map(u => {
+                      const isRoot =
+                        u.handle.toLowerCase() === 'tanaythapar' ||
+                        u.handle.toLowerCase() === 'sanvi850' ||
+                        u.email.toLowerCase().includes('tanaythapar') ||
+                        u.email.toLowerCase().includes('sanvi850');
+                      return (
+                        <option key={u.id} value={u.id} className="bg-[#111620]">
+                          @{u.handle} ({u.name} — {u.role.toUpperCase()}) {isRoot ? '★ [ROOT ADMIN]' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              </div>
+
+              {/* Role Selection Dropdown */}
+              <div className="sm:col-span-3 space-y-1">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Assign Role
+                </label>
+                <select
+                  disabled={isSelectedRootAdmin}
+                  value={targetRole}
+                  onChange={e => setTargetRole(e.target.value as UserRole)}
+                  className={`w-full bg-[#0c1015] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400 font-mono ${
+                    isSelectedRootAdmin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
+                >
+                  <option value="user">User (Standard)</option>
+                  <option value="moderator">Moderator (Review queue)</option>
+                  <option value="admin">Admin (Full access)</option>
+                </select>
+              </div>
+
+              {/* Submit Button */}
+              <div className="sm:col-span-3">
+                <button
+                  type="submit"
+                  disabled={isSelectedRootAdmin || !targetUserId}
+                  className="w-full py-2 bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Update Role
+                </button>
+              </div>
             </div>
-            <div className="sm:col-span-3">
-              <select
-                value={targetRole}
-                onChange={e => setTargetRole(e.target.value as UserRole)}
-                className="w-full bg-[#0c1015] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-400 font-mono"
+
+            {/* Root admin locked banner */}
+            {isSelectedRootAdmin && (
+              <div className="p-3 rounded-lg bg-purple-950/40 border border-purple-500/50 text-purple-200 text-xs flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
+                <span>
+                  <strong>Highest Level of Access:</strong> @TanayThapar and @Sanvi850 are immutable root administrators defined permanently in source code. Their administrator privileges cannot be modified or revoked through the UI.
+                </span>
+              </div>
+            )}
+
+            {roleMessage && (
+              <div
+                className={`text-xs p-2.5 rounded-lg border ${
+                  roleMessage.startsWith('Success')
+                    ? 'bg-lime-950/40 border-lime-500/40 text-lime-300'
+                    : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                }`}
               >
-                <option value="user">User (Standard)</option>
-                <option value="moderator">Moderator (Review queue)</option>
-                <option value="admin">Admin (Full access)</option>
-              </select>
-            </div>
-            <div className="sm:col-span-3">
-              <button
-                type="submit"
-                className="w-full py-2 bg-lime-400 hover:bg-lime-300 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
-              >
-                Update Role
-              </button>
-            </div>
+                {roleMessage}
+              </div>
+            )}
           </form>
 
-          {roleMessage && (
-            <div className="mt-2 text-xs text-lime-300 p-2.5 bg-lime-950/40 border border-lime-500/40 rounded-lg">
-              {roleMessage}
+          {/* Quick User List Table */}
+          {usersList.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-300">
+                  Registered User Accounts ({usersList.length})
+                </span>
+                <span className="text-[11px]">Click user in dropdown to edit role</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {usersList.map(u => {
+                  const isRoot =
+                    u.handle.toLowerCase() === 'tanaythapar' ||
+                    u.handle.toLowerCase() === 'sanvi850' ||
+                    u.email.toLowerCase().includes('tanaythapar') ||
+                    u.email.toLowerCase().includes('sanvi850');
+
+                  return (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => {
+                        setTargetUserId(u.id);
+                        setTargetRole(u.role);
+                        setCustomInputMode(false);
+                      }}
+                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        targetUserId === u.id
+                          ? 'bg-slate-800 border-lime-400 ring-1 ring-lime-400/40'
+                          : 'bg-[#0c1015] border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-white text-xs truncate">@{u.handle}</span>
+                        {isRoot ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-950 text-purple-300 border border-purple-500/40">
+                            ROOT
+                          </span>
+                        ) : (
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                              u.role === 'admin'
+                                ? 'bg-purple-950 text-purple-300 border border-purple-500/40'
+                                : u.role === 'moderator'
+                                ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
+                                : 'bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            {u.role}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400 truncate mt-1">{u.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -282,9 +459,11 @@ export default function AdminAnalyticsDashboard() {
           </div>
 
           <div className="p-4 rounded-xl bg-[#111620] border border-slate-800">
-            <div className="text-slate-400 text-[11px] uppercase font-bold tracking-wider">Jobs Tracked</div>
-            <div className="text-2xl font-bold font-mono text-amber-400 mt-1">{typeDistribution.job || 0}</div>
-            <div className="text-[11px] text-slate-500 mt-1">JPMC, Samsung, etc.</div>
+            <div className="text-slate-400 text-[11px] uppercase font-bold tracking-wider">Jobs & Internships</div>
+            <div className="text-2xl font-bold font-mono text-amber-400 mt-1">
+              {(typeDistribution.job || 0) + (typeDistribution.internship || 0)}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">JPMC, Samsung, Bloomberg</div>
           </div>
 
           <div className="p-4 rounded-xl bg-[#111620] border border-slate-800">
@@ -294,7 +473,7 @@ export default function AdminAnalyticsDashboard() {
           </div>
 
           <div className="p-4 rounded-xl bg-[#111620] border border-slate-800">
-            <div className="text-slate-400 text-[11px] uppercase font-bold tracking-wider">User Interactions</div>
+            <div className="text-slate-400 text-[11px] uppercase font-bold tracking-wider">User Watchlists</div>
             <div className="text-2xl font-bold font-mono text-white mt-1">{starredTotal + attendingTotal}</div>
             <div className="text-[11px] text-slate-500 mt-1">{starredTotal} saved, {attendingTotal} attending</div>
           </div>

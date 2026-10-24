@@ -283,6 +283,49 @@ export async function appendPipelineLog(log: PipelineRunLog): Promise<void> {
 
 // ── PROFILES & ROLES (Problem 8) ──────────────────────────────────────────────
 
+const IMMUTABLE_ROOT_ADMINS = ['tanaythapar', 'sanvi850'];
+
+export function isImmutableRootAdminUser(identifier?: string | null): boolean {
+  if (!identifier) return false;
+  const clean = identifier.toLowerCase().trim().replace(/^@/, '');
+  const handle = clean.split('@')[0];
+  return IMMUTABLE_ROOT_ADMINS.some(
+    root => clean === root || handle === root || (clean.includes('@') && clean.startsWith(root))
+  );
+}
+
+export async function getAllProfiles(): Promise<UserProfile[]> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    return (data as UserProfile[]) || [];
+  }
+
+  // Ensure root admin profiles exist in memory store for local development/testing
+  if (!memoryProfiles.has('usr-tanaythapar')) {
+    memoryProfiles.set('usr-tanaythapar', {
+      id: 'usr-tanaythapar',
+      email: 'tanaythapar@example.com',
+      name: 'TanayThapar',
+      handle: 'tanaythapar',
+      role: 'admin',
+      createdAt: '2026-09-01T00:00:00Z',
+    });
+  }
+  if (!memoryProfiles.has('usr-sanvi850')) {
+    memoryProfiles.set('usr-sanvi850', {
+      id: 'usr-sanvi850',
+      email: 'sanvi850@example.com',
+      name: 'Sanvi850',
+      handle: 'sanvi850',
+      role: 'admin',
+      createdAt: '2026-09-01T00:00:00Z',
+    });
+  }
+
+  return Array.from(memoryProfiles.values());
+}
+
 export async function getProfileById(id: string): Promise<UserProfile | null> {
   const supabase = getSupabaseClient();
   if (supabase) {
@@ -343,6 +386,12 @@ export async function updateUserRole(
 ): Promise<boolean> {
   const target = await getProfileById(targetUserId);
   if (!target) return false;
+
+  // Root administrators TanayThapar and Sanvi850 have permanent admin access that cannot be changed
+  if (isImmutableRootAdminUser(target.handle) || isImmutableRootAdminUser(target.email) || isImmutableRootAdminUser(target.id)) {
+    console.warn(`Blocked attempt to alter immutable root administrator role: ${target.handle}`);
+    return false;
+  }
 
   const oldRole = target.role;
 

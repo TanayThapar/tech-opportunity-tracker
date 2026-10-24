@@ -136,6 +136,51 @@ describe('Comprehensive Authentication & Authorization Security', () => {
       expect(res.status).toBe(403);
     });
 
+    it('protects immutable root administrators (TanayThapar & Sanvi850) against role modification or demotion', async () => {
+      const rootUser = await saveProfile({
+        id: 'usr-tanay',
+        email: 'tanay@example.com',
+        name: 'Tanay Thapar',
+        handle: 'TanayThapar',
+        role: 'admin',
+        createdAt: new Date().toISOString(),
+      });
+
+      const anotherAdmin = await saveProfile({
+        id: 'usr-admin-2',
+        email: 'otheradmin@example.com',
+        name: 'Other Admin',
+        handle: 'OtherAdmin',
+        role: 'admin',
+        createdAt: new Date().toISOString(),
+      });
+
+      const adminToken = createSessionToken({
+        userId: anotherAdmin.id,
+        email: anotherAdmin.email,
+        handle: anotherAdmin.handle,
+        role: 'admin',
+      });
+
+      // Attempt to demote root admin TanayThapar to 'user'
+      const demoteReq = new Request('http://localhost:3000/api/admin/roles', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetUserId: rootUser.id,
+          newRole: 'user',
+        }),
+      });
+
+      const res = await rolesPOST(demoteReq);
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error).toContain('highest level of administrative access locked in source code');
+    });
+
     it('prevents unauthenticated caller from accessing pipeline audit logs', async () => {
       const req = new Request('http://localhost:3000/api/pipeline/logs');
       const res = await logsGET(req);

