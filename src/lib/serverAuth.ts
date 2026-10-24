@@ -22,13 +22,11 @@ export function getSessionSecret(): string {
   if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16) {
     return process.env.SESSION_SECRET.trim();
   }
-  if (!memorySessionSecret) {
-    memorySessionSecret =
-      process.env.NODE_ENV === 'test'
-        ? 'vitest-test-session-secret-key-at-least-32-chars-long!!'
-        : crypto.randomBytes(32).toString('hex');
+  if (process.env.NODE_ENV === 'test') {
+    return 'vitest-test-session-secret-key-at-least-32-chars-long!!';
   }
-  return memorySessionSecret;
+  // Stable serverless key so different Lambda containers share the same session secret
+  return 'radar-secure-session-hmac-sha256-default-fallback-key-2026';
 }
 
 /**
