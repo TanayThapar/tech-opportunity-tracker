@@ -328,7 +328,18 @@ export async function getAuthenticatedUser(request: Request): Promise<UserProfil
   }
 
   if (!profile) {
-    return null;
+    // If user has a valid cryptographic token signed with server secret, rehydrate in local memory
+    const isRoot = isImmutableRootAdmin(handle) || isImmutableRootAdmin(email);
+    const isBootstrap = isBootstrapAdmin(email) || isBootstrapAdmin(handle);
+    const resolvedRole: UserRole = isRoot || isBootstrap ? 'admin' : (verification.data.role || 'user');
+    profile = await saveProfile({
+      id: userId,
+      email: email || `${userId}@radar.internal`,
+      name: handle || 'User',
+      handle: handle || 'user',
+      role: resolvedRole,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   // Enforce server-side bootstrap admin verification

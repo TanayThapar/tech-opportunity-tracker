@@ -13,6 +13,8 @@ import { OpportunityType, OpportunityOrigin, LinkStatus, ListingStatus, Opportun
 import { fetchCCFDeadlines } from '@/lib/sources/ccfddl';
 import { fetchAIDeadlines } from '@/lib/sources/aiDeadlines';
 import { fetchCuratedJobs } from '@/lib/sources/jobs';
+import { fetchMLHHackathons } from '@/lib/sources/hackathons';
+import { fetchLiveInternships } from '@/lib/sources/internships';
 
 export interface RawDiscoveredItem {
   title: string;
@@ -80,6 +82,26 @@ export async function fetchLiveWebFeedsWithErrors(): Promise<AdapterFetchResult>
     allItems.push(...jobItems);
   } catch (err: any) {
     const msg = `Jobs adapter error: ${err.message || String(err)}`;
+    console.error(msg);
+    errors.push(msg);
+  }
+
+  // Adapter 4: MLH Hackathons Web Crawler
+  try {
+    const hackathonItems = await fetchMLHHackathons();
+    allItems.push(...hackathonItems);
+  } catch (err: any) {
+    const msg = `MLH Hackathons crawler error: ${err.message || String(err)}`;
+    console.error(msg);
+    errors.push(msg);
+  }
+
+  // Adapter 5: Open Tech Internships Web Crawler
+  try {
+    const internshipItems = await fetchLiveInternships();
+    allItems.push(...internshipItems);
+  } catch (err: any) {
+    const msg = `Internships crawler error: ${err.message || String(err)}`;
     console.error(msg);
     errors.push(msg);
   }
