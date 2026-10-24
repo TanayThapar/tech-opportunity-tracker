@@ -296,6 +296,20 @@ export async function getProfileByEmail(email: string): Promise<UserProfile | nu
   return null;
 }
 
+export async function getProfileByHandle(handle: string): Promise<UserProfile | null> {
+  const clean = handle.toLowerCase().trim().replace(/^@/, '');
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    const { data } = await supabase.from('profiles').select('*').eq('handle', clean).single();
+    return data ? (data as UserProfile) : null;
+  }
+
+  for (const p of memoryProfiles.values()) {
+    if (p.handle.toLowerCase().replace(/^@/, '') === clean) return p;
+  }
+  return null;
+}
+
 export async function saveProfile(profile: UserProfile): Promise<UserProfile> {
   const supabase = getSupabaseClient();
   if (supabase) {

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { UserProfile, UserRole } from '@/types/auth';
-import { getProfileByEmail, getProfileById, saveProfile } from '@/lib/store';
+import { getProfileByEmail, getProfileById, getProfileByHandle, saveProfile } from '@/lib/store';
 
 /**
  * Constant-time comparison to prevent timing attacks.
@@ -36,15 +36,31 @@ export function verifyCronSecret(authHeader: string | null): boolean {
 }
 
 /**
- * Gets bootstrap admin emails from server-only environment variable.
+ * Gets bootstrap admin emails/handles from server-only environment variable.
  * Re-grants TanayThapar, Sanvi850, panchadip125 and any others configured server-side.
  */
 export function getBootstrapAdminEmails(): string[] {
-  const envEmails = process.env.BOOTSTRAP_ADMIN_EMAILS || 'tanaythapar@example.com,sanvi850@example.com,panchadip125@example.com';
+  const envEmails =
+    process.env.BOOTSTRAP_ADMIN_EMAILS ||
+    'tanaythapar@example.com,tanaythapar,tanay.ggmu@gmail.com,sanvi850@example.com,sanvi850,panchadip125@example.com,panchadip125';
   return envEmails
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
+}
+
+/**
+ * Checks if a given identifier, email or handle belongs to a bootstrap admin.
+ */
+export function isBootstrapAdmin(identifier?: string | null): boolean {
+  if (!identifier) return false;
+  const clean = identifier.toLowerCase().trim().replace(/^@/, '');
+  const admins = getBootstrapAdminEmails();
+  return admins.some(admin => {
+    const adminClean = admin.toLowerCase().trim().replace(/^@/, '');
+    const adminHandle = adminClean.split('@')[0];
+    return clean === adminClean || clean === adminHandle || (clean.includes('@') && clean.startsWith(adminHandle));
+  });
 }
 
 /**
@@ -55,35 +71,49 @@ export async function getAuthenticatedUser(request: Request): Promise<UserProfil
   const authHeader = request.headers.get('authorization');
   const userIdHeader = request.headers.get('x-user-id');
   const userEmailHeader = request.headers.get('x-user-email');
+  const userHandleHeader = request.headers.get('x-user-handle');
 
   let profile: UserProfile | null = null;
 
   if (userIdHeader) {
     profile = await getProfileById(userIdHeader);
-  } else if (userEmailHeader) {
+  }
+  if (!profile && userEmailHeader) {
     profile = await getProfileByEmail(userEmailHeader);
-  } else if (authHeader && authHeader.startsWith('Bearer ')) {
+    if (!profile) {
+      profile = await getProfileByHandle(userEmailHeader);
+    }
+  }
+  if (!profile && userHandleHeader) {
+    profile = await getProfileByHandle(userHandleHeader);
+    if (!profile) {
+      profile = await getProfileByEmail(userHandleHeader);
+    }
+  }
+  if (!profile && authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
-    // In production with Supabase JWT: supabase.auth.getUser(token)
-    // Here we also check if token is a direct user id
     profile = await getProfileById(token);
     if (!profile) {
       profile = await getProfileByEmail(token);
     }
+    if (!profile) {
+      profile = await getProfileByHandle(token);
+    }
   }
 
-  if (!profile && userEmailHeader) {
-    // Check if user is in bootstrap admin list on first setup
-    const cleanEmail = userEmailHeader.toLowerCase().trim();
-    const isBootstrap = getBootstrapAdminEmails().some(
-      b => cleanEmail === b || cleanEmail.startsWith(b.split('@')[0])
-    );
+  // If user does not exist in store yet, resolve bootstrap admin or auto-provision
+  const lookupCandidate = userEmailHeader || userHandleHeader || (userIdHeader?.startsWith('usr-') ? userIdHeader.slice(4) : userIdHeader);
+  if (!profile && lookupCandidate) {
+    const cleanCand = lookupCandidate.toLowerCase().trim().replace(/^@/, '');
+    const isBootstrap = isBootstrapAdmin(cleanCand);
+    const cleanHandle = (userHandleHeader || userEmailHeader?.split('@')[0] || cleanCand.split('@')[0]).replace(/^@/, '');
+    const cleanEmail = userEmailHeader || (cleanCand.includes('@') ? cleanCand : `${cleanHandle.toLowerCase()}@radar.internal`);
 
     profile = await saveProfile({
-      id: userIdHeader || `usr-${Date.now()}`,
+      id: userIdHeader || `usr-${cleanHandle.toLowerCase()}`,
       email: cleanEmail,
-      name: cleanEmail.split('@')[0],
-      handle: cleanEmail.split('@')[0],
+      name: cleanHandle,
+      handle: cleanHandle,
       role: isBootstrap ? 'admin' : 'user',
       createdAt: new Date().toISOString(),
     });
@@ -91,9 +121,7 @@ export async function getAuthenticatedUser(request: Request): Promise<UserProfil
 
   // Ensure bootstrap admins are always verified as admin in DB
   if (profile) {
-    const isBootstrap = getBootstrapAdminEmails().some(
-      b => profile!.email.toLowerCase() === b || profile!.handle.toLowerCase() === b.split('@')[0]
-    );
+    const isBootstrap = isBootstrapAdmin(profile.email) || isBootstrapAdmin(profile.handle);
     if (isBootstrap && profile.role !== 'admin') {
       profile.role = 'admin';
       await saveProfile(profile);

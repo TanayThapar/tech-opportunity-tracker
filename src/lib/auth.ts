@@ -67,8 +67,81 @@ export function login(identifier: string): { success: boolean; user?: UserProfil
   return { success: true, user };
 }
 
+/**
+ * Logs in user via server endpoint /api/auth/login to get server-verified DB role.
+ * Seeds bootstrap admins (TanayThapar, Sanvi850, panchadip125) with admin role.
+ */
+export async function loginWithServer(
+  identifier: string,
+  name?: string
+): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
+  const clean = identifier.trim();
+  if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
+
+  if (isDemoMode()) {
+    return login(clean);
+  }
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: clean, name }),
+    });
+    const data = await res.json();
+    if (!data.success) {
+      return { success: false, error: data.error || 'Authentication failed' };
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
+      window.dispatchEvent(new Event('techradar_auth_change'));
+    }
+
+    return { success: true, user: data.user };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error during login' };
+  }
+}
+
+/**
+ * Re-validates the current user session against the server to ensure
+ * client-provided role claims cannot bypass server RBAC.
+ */
+export async function fetchCurrentUser(): Promise<UserProfile | null> {
+  if (typeof window === 'undefined') return null;
+  const cached = getCurrentUser();
+  if (!cached) return null;
+
+  try {
+    const headers: Record<string, string> = {};
+    if (cached.id) headers['x-user-id'] = cached.id;
+    if (cached.email) headers['x-user-email'] = cached.email;
+    if (cached.handle) headers['x-user-handle'] = cached.handle;
+
+    const res = await fetch('/api/auth/me', { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.user) {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
+        return data.user;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to verify session with server:', err);
+  }
+  return cached;
+}
+
 export function signup(name: string, identifier: string): { success: boolean; user?: UserProfile; error?: string } {
   return login(identifier);
+}
+
+export async function signupWithServer(
+  name: string,
+  identifier: string
+): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
+  return loginWithServer(identifier, name);
 }
 
 export function logout(): void {

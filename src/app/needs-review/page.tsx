@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import OpportunityCard from '@/components/OpportunityCard';
 import { TechOpportunity } from '@/types';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, fetchCurrentUser } from '@/lib/auth';
 import { AlertCircle, CheckCircle2, RefreshCw, ShieldAlert, ArrowLeft, Shield, Check } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
@@ -16,12 +16,16 @@ export default function NeedsReviewPage() {
   const [approvalBasis, setApprovalBasis] = useState('Organizer official link and dates verified');
 
   const fetchPendingEvents = async () => {
-    const user = getCurrentUser();
+    let user = getCurrentUser();
     try {
       setLoading(true);
+      const serverUser = await fetchCurrentUser();
+      if (serverUser) user = serverUser;
+
       const headers: Record<string, string> = {};
       if (user?.email) headers['x-user-email'] = user.email;
       if (user?.id) headers['x-user-id'] = user.id;
+      if (user?.handle) headers['x-user-handle'] = user.handle;
 
       const res = await fetch('/api/opportunities?status=needs_review', { headers });
       const json = await res.json();
@@ -42,11 +46,15 @@ export default function NeedsReviewPage() {
   }, []);
 
   const handleApprove = async (id: string) => {
-    const user = getCurrentUser();
+    let user = getCurrentUser();
     try {
+      const serverUser = await fetchCurrentUser();
+      if (serverUser) user = serverUser;
+
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (user?.email) headers['x-user-email'] = user.email;
       if (user?.id) headers['x-user-id'] = user.id;
+      if (user?.handle) headers['x-user-handle'] = user.handle;
 
       const res = await fetch('/api/opportunities', {
         method: 'PATCH',

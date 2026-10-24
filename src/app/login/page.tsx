@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
-import { login, signup, getCurrentUser, isDemoMode } from '@/lib/auth';
+import { loginWithServer, signupWithServer, getCurrentUser, isDemoMode } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { Terminal, Shield, User, ArrowRight, Lock, KeyRound, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const demoActive = isDemoMode();
 
   useEffect(() => {
@@ -22,24 +23,44 @@ export default function LoginPage() {
     }
   }, [router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSubmitting(true);
 
-    if (isSignUp) {
-      const res = signup(name, identifier);
-      if (!res.success) {
-        setError(res.error || 'Registration failed');
-        return;
+    try {
+      if (isSignUp) {
+        const res = await signupWithServer(name, identifier);
+        if (!res.success) {
+          setError(res.error || 'Registration failed');
+          return;
+        }
+        router.push('/');
+      } else {
+        const res = await loginWithServer(identifier);
+        if (!res.success) {
+          setError(res.error || 'Authentication failed');
+          return;
+        }
+        router.push('/');
       }
-      router.push('/');
-    } else {
-      const res = login(identifier);
-      if (!res.success) {
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleQuickAdminLogin = async (handle: string) => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await loginWithServer(handle);
+      if (res.success) {
+        router.push('/admin');
+      } else {
         setError(res.error || 'Authentication failed');
-        return;
       }
-      router.push('/');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -157,6 +178,49 @@ export default function LoginPage() {
                 </button>
               </span>
             )}
+          </div>
+
+          {/* Quick-Access Server-Verified Admins */}
+          <div className="pt-3 border-t border-zinc-800/80 space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-zinc-500">
+              <span className="flex items-center gap-1">
+                <Shield className="w-3.5 h-3.5 text-purple-400" />
+                <span>BOOTSTRAP_ADMINS (Server Verified):</span>
+              </span>
+              <span className="text-purple-400 font-bold">TanayThapar • Sanvi850 • panchadip125</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleQuickAdminLogin('TanayThapar')}
+                className="py-1.5 px-2 bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/50 text-purple-300 rounded text-xs transition-all text-left flex items-center justify-between cursor-pointer disabled:opacity-50"
+              >
+                <span className="truncate font-bold">@TanayThapar</span>
+                <span className="text-[10px] text-purple-400">&gt;</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleQuickAdminLogin('Sanvi850')}
+                className="py-1.5 px-2 bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/50 text-purple-300 rounded text-xs transition-all text-left flex items-center justify-between cursor-pointer disabled:opacity-50"
+              >
+                <span className="truncate font-bold">@Sanvi850</span>
+                <span className="text-[10px] text-purple-400">&gt;</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => handleQuickAdminLogin('panchadip125')}
+                className="py-1.5 px-2 bg-purple-950/40 hover:bg-purple-900/60 border border-purple-500/50 text-purple-300 rounded text-xs transition-all text-left flex items-center justify-between cursor-pointer disabled:opacity-50"
+              >
+                <span className="truncate font-bold">@panchadip125</span>
+                <span className="text-[10px] text-purple-400">&gt;</span>
+              </button>
+            </div>
           </div>
         </motion.div>
       </main>

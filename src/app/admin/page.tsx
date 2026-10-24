@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import { TechOpportunity, PipelineRunLog } from '@/types';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, fetchCurrentUser, loginWithServer } from '@/lib/auth';
 import { UserProfile, UserRole } from '@/types/auth';
 import {
   ShieldAlert,
@@ -39,15 +39,21 @@ export default function AdminAnalyticsDashboard() {
   const [roleMessage, setRoleMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const u = getCurrentUser();
-    setUser(u);
-
-    const fetchData = async () => {
+    const verifyAndFetch = async () => {
       try {
         setLoading(true);
+        // Verify session with server to establish DB role
+        let u = getCurrentUser();
+        const serverUser = await fetchCurrentUser();
+        if (serverUser) {
+          u = serverUser;
+        }
+        setUser(u);
+
         const headers: Record<string, string> = {};
         if (u?.email) headers['x-user-email'] = u.email;
         if (u?.id) headers['x-user-id'] = u.id;
+        if (u?.handle) headers['x-user-handle'] = u.handle;
 
         const [oppsRes, logsRes] = await Promise.all([
           fetch('/api/opportunities?status=published', { headers }),
@@ -65,7 +71,7 @@ export default function AdminAnalyticsDashboard() {
       }
     };
 
-    fetchData();
+    verifyAndFetch();
   }, []);
 
   const handleUpdateRole = async (e: React.FormEvent) => {
@@ -76,6 +82,7 @@ export default function AdminAnalyticsDashboard() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (user?.email) headers['x-user-email'] = user.email;
       if (user?.id) headers['x-user-id'] = user.id;
+      if (user?.handle) headers['x-user-handle'] = user.handle;
 
       const res = await fetch('/api/admin/roles', {
         method: 'POST',
@@ -161,12 +168,58 @@ export default function AdminAnalyticsDashboard() {
               )}
             </div>
 
-            <Link
-              href="/"
-              className="block w-full py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 font-medium text-xs rounded transition-colors"
-            >
-              ← Return to Main Calendar
-            </Link>
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await loginWithServer('TanayThapar');
+                  if (res.success && res.user) {
+                    setUser(res.user);
+                    window.location.reload();
+                  }
+                }}
+                className="w-full py-2.5 bg-purple-950 hover:bg-purple-900 border border-purple-500 text-purple-200 font-bold text-xs rounded transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4 text-purple-400" />
+                <span>Authenticate Session as @TanayThapar</span>
+              </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await loginWithServer('Sanvi850');
+                    if (res.success && res.user) {
+                      setUser(res.user);
+                      window.location.reload();
+                    }
+                  }}
+                  className="py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded transition-colors cursor-pointer"
+                >
+                  As @Sanvi850
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await loginWithServer('panchadip125');
+                    if (res.success && res.user) {
+                      setUser(res.user);
+                      window.location.reload();
+                    }
+                  }}
+                  className="py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded transition-colors cursor-pointer"
+                >
+                  As @panchadip125
+                </button>
+              </div>
+
+              <Link
+                href="/"
+                className="block w-full py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 font-medium text-xs rounded transition-colors mt-2"
+              >
+                ← Return to Main Calendar
+              </Link>
+            </div>
           </div>
         </main>
       </div>

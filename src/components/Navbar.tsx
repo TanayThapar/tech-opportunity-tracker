@@ -18,7 +18,7 @@ import {
   Briefcase,
   AlertTriangle,
 } from 'lucide-react';
-import { getCurrentUser, logout, isDemoMode } from '@/lib/auth';
+import { getCurrentUser, logout, isDemoMode, fetchCurrentUser } from '@/lib/auth';
 import { UserProfile } from '@/types/auth';
 import { TechOpportunity } from '@/types';
 import { getApproachingReminders, getReminderLabel, getReminderTypeLabel, ReminderAlert } from '@/lib/reminders';
@@ -39,7 +39,12 @@ export default function Navbar({ onTriggerPipeline, isRunningPipeline, opportuni
   const [showReminderTray, setShowReminderTray] = useState(false);
   const [reminders, setReminders] = useState<ReminderAlert[]>([]);
 
-  const syncUser = () => setUser(getCurrentUser());
+  const syncUser = () => {
+    setUser(getCurrentUser());
+    fetchCurrentUser().then(u => {
+      if (u) setUser(u);
+    });
+  };
 
   useEffect(() => {
     syncUser();
