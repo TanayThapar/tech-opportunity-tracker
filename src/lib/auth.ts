@@ -90,17 +90,25 @@ export async function loginWithServer(
 export async function signupWithServer(
   name: string,
   identifier: string,
-  password?: string
+  password?: string,
+  email?: string,
+  handle?: string
 ): Promise<{ success: boolean; user?: UserProfile; token?: string; error?: string }> {
   const cleanName = name.trim();
   const clean = identifier.trim();
-  if (!clean) return { success: false, error: 'Username or Email cannot be empty' };
+  if (!clean && !email && !handle) return { success: false, error: 'Username or Email cannot be empty' };
 
   try {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: cleanName, identifier: clean, password }),
+      body: JSON.stringify({
+        name: cleanName,
+        identifier: clean || handle,
+        email: email || (clean.includes('@') ? clean : undefined),
+        handle: handle || (!clean.includes('@') ? clean : undefined),
+        password,
+      }),
     });
 
     const data = await res.json();

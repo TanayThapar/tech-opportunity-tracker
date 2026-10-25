@@ -44,6 +44,11 @@ export async function POST(request: Request) {
             { status: 401 }
           );
         }
+      } else if (profile.passwordHash && !password) {
+        return NextResponse.json(
+          { success: false, error: 'Password is required to sign in to this account.' },
+          { status: 401 }
+        );
       } else if (!profile.passwordHash && password) {
         // First login with password sets it
         profile.passwordHash = hashPassword(password);

@@ -360,7 +360,7 @@ export async function getProfileByHandle(handle: string): Promise<UserProfile | 
   const clean = handle.toLowerCase().trim().replace(/^@/, '');
   const supabase = getSupabaseClient();
   if (supabase) {
-    const { data } = await supabase.from('profiles').select('*').eq('handle', clean).single();
+    const { data } = await supabase.from('profiles').select('*').ilike('handle', clean).single();
     return data ? (data as UserProfile) : null;
   }
 
