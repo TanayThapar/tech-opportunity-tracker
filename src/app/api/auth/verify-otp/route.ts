@@ -23,6 +23,14 @@ export async function POST(request: Request) {
       );
     }
 
+    if (Date.now() > pending.expiresAt) {
+      await deletePendingOtp(email);
+      return NextResponse.json(
+        { success: false, error: 'Verification code has expired. Please request a new code.' },
+        { status: 400 }
+      );
+    }
+
     if (pending.otp !== otp) {
       pending.attempts = (pending.attempts || 0) + 1;
       if (pending.attempts >= 5) {

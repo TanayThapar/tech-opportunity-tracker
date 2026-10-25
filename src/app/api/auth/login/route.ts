@@ -52,6 +52,16 @@ export async function POST(request: Request) {
     }
 
     if (profile) {
+      if (profile.role === 'revoked') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Account access has been revoked by an administrator. Please contact support.',
+          },
+          { status: 403 }
+        );
+      }
+
       if (!isRootAdmin) {
         // If profile has a passwordHash and password is provided, verify it
         if (profile.passwordHash && password) {

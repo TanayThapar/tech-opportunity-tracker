@@ -461,6 +461,32 @@ export async function updateUserRole(
   return true;
 }
 
+export async function deleteUserProfile(userId: string): Promise<boolean> {
+  const target = await getProfileById(userId);
+  if (!target) return false;
+
+  // Protect immutable root administrators
+  if (isImmutableRootAdminUser(target.handle) || isImmutableRootAdminUser(target.email) || isImmutableRootAdminUser(target.id)) {
+    console.warn(`Blocked attempt to erase immutable root administrator: ${target.handle}`);
+    return false;
+  }
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    await supabase.from('profiles').delete().eq('id', userId);
+    await supabase.from('user_interactions').delete().eq('user_id', userId);
+    await supabase.from('notification_preferences').delete().eq('user_id', userId);
+    await supabase.from('user_updates').delete().eq('user_id', userId);
+    return true;
+  }
+
+  memoryProfiles.delete(userId);
+  memoryInteractions.delete(userId);
+  memoryPreferences.delete(userId);
+  memoryUpdates.delete(userId);
+  return true;
+}
+
 // ── USER INTERACTIONS (Row Level Isolation) ───────────────────────────────────
 
 export async function getUserInteractions(userId: string): Promise<Record<string, UserEventInteraction>> {

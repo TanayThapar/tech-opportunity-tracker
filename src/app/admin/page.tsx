@@ -25,6 +25,10 @@ import {
   ArrowLeft,
   Users,
   ShieldQuestion,
+  Trash2,
+  UserX,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { getAllInteractions } from '@/lib/interactions';
@@ -41,6 +45,8 @@ export default function AdminAnalyticsDashboard() {
   const [targetRole, setTargetRole] = useState<UserRole>('moderator');
   const [roleMessage, setRoleMessage] = useState<string | null>(null);
   const [customInputMode, setCustomInputMode] = useState(false);
+  const [eraseTargetUser, setEraseTargetUser] = useState<UserProfile | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -135,6 +141,73 @@ export default function AdminAnalyticsDashboard() {
       }
     } catch (err: any) {
       setRoleMessage(`Error: ${err.message}`);
+    }
+  };
+
+  const handleRevokeOrRestore = async (target: UserProfile) => {
+    const isRoot =
+      target.handle.toLowerCase() === 'tanaythapar' ||
+      target.handle.toLowerCase() === 'sanvi850' ||
+      target.email.toLowerCase().includes('tanaythapar') ||
+      target.email.toLowerCase().includes('sanvi850');
+
+    if (isRoot) {
+      setRoleMessage('Error: Root administrators TanayThapar and Sanvi850 are locked in source code and cannot be revoked.');
+      return;
+    }
+
+    if (target.id === user?.id || target.handle.toLowerCase() === user?.handle?.toLowerCase()) {
+      setRoleMessage('Error: You cannot revoke your own active admin account.');
+      return;
+    }
+
+    const nextRole: UserRole = target.role === 'revoked' ? 'user' : 'revoked';
+    try {
+      setIsActionLoading(true);
+      const res = await fetch('/api/admin/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          targetUserId: target.id,
+          newRole: nextRole,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRoleMessage(`Success: User @${target.handle} access ${nextRole === 'revoked' ? 'revoked' : 'restored to user'}.`);
+        await fetchUsers();
+        setTimeout(() => setRoleMessage(null), 4000);
+      } else {
+        setRoleMessage(`Error: ${data.error || 'Failed to update user access'}`);
+      }
+    } catch (err: any) {
+      setRoleMessage(`Error: ${err.message}`);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleConfirmErase = async () => {
+    if (!eraseTargetUser) return;
+    try {
+      setIsActionLoading(true);
+      const res = await fetch(`/api/admin/roles?userId=${encodeURIComponent(eraseTargetUser.id)}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRoleMessage(`Success: Account @${eraseTargetUser.handle} and all associated records permanently erased.`);
+        setEraseTargetUser(null);
+        await fetchUsers();
+        setTimeout(() => setRoleMessage(null), 4000);
+      } else {
+        setRoleMessage(`Error: ${data.error || 'Failed to erase account'}`);
+      }
+    } catch (err: any) {
+      setRoleMessage(`Error: ${err.message}`);
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -350,6 +423,7 @@ export default function AdminAnalyticsDashboard() {
                   <option value="user">User (Standard)</option>
                   <option value="moderator">Moderator (Review queue)</option>
                   <option value="admin">Admin (Full access)</option>
+                  <option value="revoked" className="text-rose-400 font-bold">Revoked / Suspended (Blocked)</option>
                 </select>
               </div>
 
@@ -388,61 +462,134 @@ export default function AdminAnalyticsDashboard() {
             )}
           </form>
 
-          {/* Quick User List Table */}
+          {/* Quick User List Table & Account Access Controls */}
           {usersList.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-slate-800">
-              <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+            <div className="mt-4 pt-3 border-t border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-1">
                 <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-300">
                   Registered User Accounts ({usersList.length})
                 </span>
-                <span className="text-[11px]">Click user in dropdown to edit role</span>
+                <span className="text-[11px] text-slate-400">
+                  Manage permissions, revoke login access, or completely erase user accounts
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              <div className="divide-y divide-slate-800/80 rounded-lg border border-slate-800 bg-[#0c1015] overflow-hidden">
                 {usersList.map(u => {
                   const isRoot =
                     u.handle.toLowerCase() === 'tanaythapar' ||
                     u.handle.toLowerCase() === 'sanvi850' ||
                     u.email.toLowerCase().includes('tanaythapar') ||
                     u.email.toLowerCase().includes('sanvi850');
+                  const isSelf = u.id === user?.id || u.handle.toLowerCase() === user?.handle?.toLowerCase();
+                  const isRevoked = u.role === 'revoked';
 
                   return (
-                    <button
+                    <div
                       key={u.id}
-                      type="button"
-                      onClick={() => {
-                        setTargetUserId(u.id);
-                        setTargetRole(u.role);
-                        setCustomInputMode(false);
-                      }}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        targetUserId === u.id
-                          ? 'bg-slate-800 border-lime-400 ring-1 ring-lime-400/40'
-                          : 'bg-[#0c1015] border-slate-800 hover:border-slate-700'
+                      className={`p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+                        targetUserId === u.id ? 'bg-slate-800/40' : 'hover:bg-slate-900/40'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-bold text-white text-xs truncate">@{u.handle}</span>
-                        {isRoot ? (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-950 text-purple-300 border border-purple-500/40">
-                            ROOT
-                          </span>
-                        ) : (
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
-                              u.role === 'admin'
-                                ? 'bg-purple-950 text-purple-300 border border-purple-500/40'
-                                : u.role === 'moderator'
-                                ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
-                                : 'bg-slate-800 text-slate-300'
-                            }`}
-                          >
-                            {u.role}
+                      <div className="flex items-start sm:items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 shrink-0">
+                          {u.name ? u.name.charAt(0).toUpperCase() : u.handle.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-white text-xs truncate">@{u.handle}</span>
+                            {isRoot ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-950 text-purple-300 border border-purple-500/50 flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3 text-purple-400" />
+                                ROOT ADMIN
+                              </span>
+                            ) : isRevoked ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950 text-rose-300 border border-rose-500/50 flex items-center gap-1">
+                                <UserX className="w-3 h-3 text-rose-400" />
+                                REVOKED
+                              </span>
+                            ) : (
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                                  u.role === 'admin'
+                                    ? 'bg-purple-950 text-purple-300 border border-purple-500/40'
+                                    : u.role === 'moderator'
+                                    ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
+                                    : 'bg-slate-800 text-slate-300 border border-slate-700'
+                                }`}
+                              >
+                                {u.role}
+                              </span>
+                            )}
+                            {isSelf && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate flex items-center gap-2 mt-0.5">
+                            <span>{u.name}</span>
+                            <span className="text-slate-600">•</span>
+                            <span className="font-mono text-slate-400">{u.email}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row Actions */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetUserId(u.id);
+                            setTargetRole(u.role);
+                            setCustomInputMode(false);
+                          }}
+                          className={`px-2.5 py-1 text-xs rounded border transition-colors cursor-pointer ${
+                            targetUserId === u.id
+                              ? 'bg-lime-400 text-slate-950 font-bold border-lime-400'
+                              : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          Select
+                        </button>
+
+                        {!isRoot && !isSelf && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isActionLoading}
+                              onClick={() => handleRevokeOrRestore(u)}
+                              className={`px-2.5 py-1 text-xs font-semibold rounded border transition-colors cursor-pointer flex items-center gap-1 ${
+                                isRevoked
+                                  ? 'bg-emerald-950/60 hover:bg-emerald-900 border-emerald-500/50 text-emerald-300'
+                                  : 'bg-amber-950/40 hover:bg-amber-900/60 border-amber-500/40 text-amber-300'
+                              }`}
+                              title={isRevoked ? 'Restore account access' : 'Revoke and suspend account access'}
+                            >
+                              <UserX className="w-3.5 h-3.5" />
+                              <span>{isRevoked ? 'Restore' : 'Revoke'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isActionLoading}
+                              onClick={() => setEraseTargetUser(u)}
+                              className="px-2.5 py-1 text-xs font-semibold rounded border border-rose-500/40 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 transition-colors cursor-pointer flex items-center gap-1"
+                              title="Completely erase user account and all data"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Erase</span>
+                            </button>
+                          </>
+                        )}
+
+                        {isRoot && (
+                          <span className="text-[11px] text-purple-400 font-mono italic px-2">
+                            Immutable Root
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-400 truncate mt-1">{u.name}</div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -493,6 +640,65 @@ export default function AdminAnalyticsDashboard() {
             ))}
           </div>
         </div>
+
+        {/* Erase Account Confirmation Modal */}
+        {eraseTargetUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="max-w-md w-full bg-[#111620] border border-rose-500/50 rounded-xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Permanently Erase Account</h3>
+                    <p className="text-xs text-rose-400">Irreversible administrative action</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEraseTargetUser(null)}
+                  className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-3 bg-[#0c1015] rounded-lg border border-slate-800 text-xs space-y-2">
+                <div className="text-slate-300">
+                  You are about to completely erase the account for:
+                </div>
+                <div className="font-mono text-xs text-white font-bold bg-slate-900 p-2.5 rounded border border-slate-800">
+                  @{eraseTargetUser.handle} ({eraseTargetUser.name})
+                  <div className="text-xs text-slate-400 font-normal">{eraseTargetUser.email}</div>
+                </div>
+                <p className="text-slate-400 leading-relaxed text-[11px]">
+                  Erasing this user permanently wipes their profile, email records, saved opportunities watchlist, notification preferences, and event interactions from the database.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isActionLoading}
+                  onClick={() => setEraseTargetUser(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isActionLoading}
+                  onClick={handleConfirmErase}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold tracking-wider uppercase transition-colors cursor-pointer flex items-center gap-1.5 shadow-lg shadow-rose-950 disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isActionLoading ? 'Erasing...' : 'Confirm Erase'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

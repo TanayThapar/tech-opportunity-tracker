@@ -306,6 +306,9 @@ export async function getAuthenticatedUser(request: Request): Promise<UserProfil
             profile.role = 'admin';
             await saveProfile(profile);
           }
+          if (profile.role === 'revoked') {
+            return null;
+          }
           const { passwordHash: _, ...sanitized } = profile;
           return sanitized;
         }
@@ -352,6 +355,10 @@ export async function getAuthenticatedUser(request: Request): Promise<UserProfil
   if (isBootstrap && profile.role !== 'admin') {
     profile.role = 'admin';
     await saveProfile(profile);
+  }
+
+  if (profile.role === 'revoked') {
+    return null;
   }
 
   const { passwordHash: _, ...sanitized } = profile;

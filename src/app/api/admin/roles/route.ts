@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireRole, isImmutableRootAdmin } from '@/lib/serverAuth';
-import { updateUserRole, getProfileById, getAllProfiles } from '@/lib/store';
+import { updateUserRole, getProfileById, getAllProfiles, deleteUserProfile } from '@/lib/store';
 import { UserRole } from '@/types/auth';
 
 export async function GET(request: Request) {
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const validRoles: UserRole[] = ['user', 'moderator', 'admin'];
+    const validRoles: UserRole[] = ['user', 'moderator', 'admin', 'revoked'];
     if (!validRoles.includes(newRole)) {
       return NextResponse.json(
         { success: false, error: `Invalid role "${newRole}". Must be one of: ${validRoles.join(', ')}` },
@@ -69,6 +69,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Admins cannot revoke themselves
+    if (newRole === 'revoked' && (targetProfile.id === user?.id || targetProfile.handle.toLowerCase() === user?.handle?.toLowerCase())) {
+      return NextResponse.json(
+        { success: false, error: 'Self-revocation forbidden: You cannot revoke your own active admin account.' },
+        { status: 400 }
+      );
+    }
+
     const success = await updateUserRole(targetUserId, newRole, user!.email || user!.handle || user!.id);
     if (!success) {
       return NextResponse.json({ success: false, error: 'Failed to update role' }, { status: 500 });
@@ -77,6 +85,65 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: `User ${targetUserId} role updated to ${newRole}`,
+    });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { user, errorResponse } = await requireRole(request, ['admin']);
+    if (errorResponse) {
+      return errorResponse;
+    }
+
+    const { searchParams } = new URL(request.url);
+    const targetUserId = searchParams.get('userId');
+
+    if (!targetUserId) {
+      return NextResponse.json(
+        { success: false, error: 'userId parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    const targetProfile = await getProfileById(targetUserId);
+    if (!targetProfile) {
+      return NextResponse.json({ success: false, error: 'Target user not found' }, { status: 404 });
+    }
+
+    // Immutable root admin safety guard
+    if (
+      isImmutableRootAdmin(targetProfile.handle) ||
+      isImmutableRootAdmin(targetProfile.email) ||
+      isImmutableRootAdmin(targetProfile.id)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Protected Account: TanayThapar and Sanvi850 are root administrators and cannot be erased.',
+        },
+        { status: 403 }
+      );
+    }
+
+    // Admins cannot erase themselves
+    if (targetProfile.id === user?.id || targetProfile.handle.toLowerCase() === user?.handle?.toLowerCase()) {
+      return NextResponse.json(
+        { success: false, error: 'Self-deletion forbidden: You cannot erase your own active admin account.' },
+        { status: 400 }
+      );
+    }
+
+    const deleted = await deleteUserProfile(targetUserId);
+    if (!deleted) {
+      return NextResponse.json({ success: false, error: 'Failed to erase user profile' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Account @${targetProfile.handle} (${targetProfile.name}) was completely erased.`,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

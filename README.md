@@ -68,14 +68,23 @@ Dedicated track filtering dropdown on the dashboard:
 - **Anti-Bot Challenge Handling**: Academic publishers (ACM, IEEE, USENIX) returning HTTP 403/401 Cloudflare verification are recognized as live web servers rather than dead links.
 - **Quarantine Queue** (`/needs-review`): Low-confidence, user-submitted, and AI-extracted items remain hidden from public feeds until approved by a moderator.
 
-### 7. Verified Authentication & Immutable Root Admins
-- **Secure Authentication**: Verified HMAC-SHA256 session tokens with server-side validation; caller-supplied identity headers and client spoofing are blocked.
-- **Role-Based Access Control (RBAC)**: User, Moderator, Admin, and Root Admin roles enforced in server routes.
-- **Immutable Root Administrators**:
-  - `@TanayThapar`
-  - `@Sanvi850`
-  - Root admin permissions are anchored directly in the source code ([`src/lib/auth.ts`](./src/lib/auth.ts)) and cannot be revoked, demoted, or reassigned through database modifications or the UI.
-- **Admin Management Panel** (`/admin`): Allows Root Admins and Admins to inspect users, assign roles via dropdown menu, review pipeline logs, and manage opportunity review queues.
+### 7. Verified Authentication, Email OTP & Admin Account Access Controls
+- **Email OTP Confirmation System**:
+  - Sign-up enforces real email confirmation using a 6-digit cryptographic verification code (`/api/auth/signup`, `/api/auth/verify-otp`, `/api/auth/resend-otp`).
+  - Account is activated (`emailVerified: true`) only upon entering the valid OTP code within the 10-minute validity window.
+  - Rate-limited to max 5 failed attempts per OTP code before automatic invalidation.
+  - Zero paid dependencies: supports standard SMTP via Nodemailer or development fallback logging.
+- **Strict Prior Registration Requirement**:
+  - Unrecognized identifiers can no longer sign in without prior account creation (HTTP 404: `"Account not found. Please create an account before signing in."`).
+- **Password Protection for Root Admins**:
+  - `@TanayThapar` and `@Sanvi850` accounts require the authorized password (`Manipal`) to authenticate.
+  - Public registration claiming root admin usernames/emails is strictly blocked (HTTP 403).
+  - Root admin roles are permanently locked in source code and cannot be modified or demoted.
+- **Admin Account Revocation & Complete Erasure Controls** (`/admin`):
+  - **Account Revocation**: Admins can suspend/revoke any user account (`role: 'revoked'`). Revoked users are immediately blocked from logging in (HTTP 403) and active cryptographic sessions are invalidated (HTTP 401).
+  - **Account Erasure**: Admins can permanently delete accounts via `DELETE /api/admin/roles?userId=...` with confirmation dialogs. Completely wipes user profile, saved watchlists, email records, and notification preferences.
+  - **Immutable Root Admin Immunity**: Both root administrator accounts are permanently protected against revocation and deletion.
+  - **Self-Destruction Protection**: Admins cannot revoke or erase their own active accounts.
 
 ### 8. Personal Watchlist & Notifications
 - **Watchlist (Bookmark)**: Save opportunities to a personal watchlist.
@@ -93,7 +102,7 @@ Dedicated track filtering dropdown on the dashboard:
 - **Date Handling**: `date-fns`
 - **Validation**: Zod
 - **Deduplication**: Fast-Levenshtein with normalized title, date, and organizer containment
-- **Testing**: Vitest (79 tests across 15 suites)
+- **Testing**: Vitest (94 tests across 17 suites)
 - **Zero Paid Dependencies**: 100% open-source libraries, free community feeds, and self-hostable tools.
 
 ---
