@@ -20,11 +20,11 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
     expect(isBootstrapAdmin('unknown_user')).toBe(false);
   });
 
-  it('assigns role "admin" to @TanayThapar upon login', async () => {
+  it('assigns role "admin" to @TanayThapar upon login with correct password "Manipal"', async () => {
     const req = new Request('http://localhost:3000/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: '@TanayThapar' }),
+      body: JSON.stringify({ identifier: '@TanayThapar', password: 'Manipal' }),
     });
 
     const res = await loginPOST(req);
@@ -35,6 +35,42 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
     expect(data.user.handle.toLowerCase()).toBe('tanaythapar');
     expect(data.user.role).toBe('admin');
     expect(data.token).toBeDefined();
+  });
+
+  it('rejects root admin login when password is missing or incorrect', async () => {
+    // 1. Missing password
+    const noPassReq = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'TanayThapar' }),
+    });
+    const noPassRes = await loginPOST(noPassReq);
+    expect(noPassRes.status).toBe(401);
+    const noPassData = await noPassRes.json();
+    expect(noPassData.success).toBe(false);
+
+    // 2. Incorrect password
+    const wrongPassReq = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'Sanvi850', password: 'wrong_password_123' }),
+    });
+    const wrongPassRes = await loginPOST(wrongPassReq);
+    expect(wrongPassRes.status).toBe(401);
+    const wrongPassData = await wrongPassRes.json();
+    expect(wrongPassData.success).toBe(false);
+
+    // 3. Correct password for Sanvi850 succeeds
+    const correctReq = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'Sanvi850', password: 'Manipal' }),
+    });
+    const correctRes = await loginPOST(correctReq);
+    expect(correctRes.status).toBe(200);
+    const correctData = await correctRes.json();
+    expect(correctData.success).toBe(true);
+    expect(correctData.user.role).toBe('admin');
   });
 
   it('assigns role "user" to a non-admin account upon login', async () => {
@@ -57,7 +93,7 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
     const loginReq = new Request('http://localhost:3000/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: 'TanayThapar' }),
+      body: JSON.stringify({ identifier: 'TanayThapar', password: 'Manipal' }),
     });
     const loginRes = await loginPOST(loginReq);
     const loginData = await loginRes.json();

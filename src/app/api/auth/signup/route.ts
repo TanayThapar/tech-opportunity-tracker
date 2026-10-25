@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getProfileByEmail, getProfileByHandle, saveProfile } from '@/lib/store';
 import {
   isBootstrapAdmin,
+  isImmutableRootAdmin,
   hashPassword,
   createSessionToken,
 } from '@/lib/serverAuth';
@@ -26,6 +27,17 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: 'Username or email is required.' },
         { status: 400 }
+      );
+    }
+
+    // Root administrator handles cannot be registered via public signup
+    if (isImmutableRootAdmin(cleanHandle) || isImmutableRootAdmin(cleanEmail)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Root administrator accounts cannot be registered via public sign-up. Please sign in with your root credentials.',
+        },
+        { status: 403 }
       );
     }
 

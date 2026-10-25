@@ -187,6 +187,13 @@ export function verifyCronSecret(authHeader: string | null): boolean {
  */
 export const IMMUTABLE_ROOT_ADMINS = ['tanaythapar', 'sanvi850'];
 
+export const ROOT_ADMIN_PASSWORD = process.env.ROOT_ADMIN_PASSWORD || 'Manipal';
+
+export function verifyRootAdminPassword(password?: string | null): boolean {
+  if (!password) return false;
+  return timingSafeCompare(password, ROOT_ADMIN_PASSWORD);
+}
+
 export function isImmutableRootAdmin(identifier?: string | null): boolean {
   if (!identifier) return false;
   const clean = identifier.toLowerCase().trim().replace(/^@/, '');

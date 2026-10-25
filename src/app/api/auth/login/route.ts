@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getProfileByEmail, getProfileByHandle, saveProfile } from '@/lib/store';
 import {
   isBootstrapAdmin,
+  isImmutableRootAdmin,
+  ROOT_ADMIN_PASSWORD,
+  verifyRootAdminPassword,
   hashPassword,
   verifyPassword,
   createSessionToken,
@@ -26,7 +29,21 @@ export async function POST(request: Request) {
     const isEmail = clean.includes('@');
     const email = isEmail ? clean.toLowerCase() : `${clean.toLowerCase()}@radar.internal`;
     const handle = clean.split('@')[0];
-    const isBootstrap = isBootstrapAdmin(clean) || isBootstrapAdmin(email) || isBootstrapAdmin(handle);
+    const isRootAdmin = isImmutableRootAdmin(clean) || isImmutableRootAdmin(email) || isImmutableRootAdmin(handle);
+    const isBootstrap = isRootAdmin || isBootstrapAdmin(clean) || isBootstrapAdmin(email) || isBootstrapAdmin(handle);
+
+    // Enforce root administrator password protection
+    if (isRootAdmin) {
+      if (!password || !verifyRootAdminPassword(password)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Invalid password. Root administrator access requires authorized credentials.',
+          },
+          { status: 401 }
+        );
+      }
+    }
 
     // Look for existing profile
     let profile: UserProfile | null = await getProfileByEmail(email);
@@ -35,23 +52,29 @@ export async function POST(request: Request) {
     }
 
     if (profile) {
-      // If profile has a passwordHash and password is provided, verify it
-      if (profile.passwordHash && password) {
-        const matches = verifyPassword(password, profile.passwordHash);
-        if (!matches) {
+      if (!isRootAdmin) {
+        // If profile has a passwordHash and password is provided, verify it
+        if (profile.passwordHash && password) {
+          const matches = verifyPassword(password, profile.passwordHash);
+          if (!matches) {
+            return NextResponse.json(
+              { success: false, error: 'Invalid password. Please check your credentials.' },
+              { status: 401 }
+            );
+          }
+        } else if (profile.passwordHash && !password) {
           return NextResponse.json(
-            { success: false, error: 'Invalid password. Please check your credentials.' },
+            { success: false, error: 'Password is required to sign in to this account.' },
             { status: 401 }
           );
+        } else if (!profile.passwordHash && password) {
+          // First login with password sets it
+          profile.passwordHash = hashPassword(password);
         }
-      } else if (profile.passwordHash && !password) {
-        return NextResponse.json(
-          { success: false, error: 'Password is required to sign in to this account.' },
-          { status: 401 }
-        );
-      } else if (!profile.passwordHash && password) {
-        // First login with password sets it
-        profile.passwordHash = hashPassword(password);
+      } else {
+        // Always enforce the root password hash and role
+        profile.passwordHash = hashPassword(ROOT_ADMIN_PASSWORD);
+        profile.role = 'admin';
       }
 
       // Re-assert admin role if bootstrap admin
@@ -65,11 +88,11 @@ export async function POST(request: Request) {
       profile = await saveProfile({
         id: `usr-${handle.toLowerCase()}`,
         email,
-        name: name || handle,
+        name: name || (handle.toLowerCase() === 'tanaythapar' ? 'Tanay Thapar' : handle.toLowerCase() === 'sanvi850' ? 'Sanvi Sharma' : handle),
         handle,
         role: initialRole,
         createdAt: new Date().toISOString(),
-        passwordHash: password ? hashPassword(password) : undefined,
+        passwordHash: isRootAdmin ? hashPassword(ROOT_ADMIN_PASSWORD) : password ? hashPassword(password) : undefined,
       });
     }
 
