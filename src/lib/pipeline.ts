@@ -103,6 +103,9 @@ export async function determineConfidenceWithLiveness(
     if (probe.ok) {
       isLivenessOk = true;
       reasons.push('source URL reachable at fetch time');
+    } else if (item.origin === 'adapter' && (probe.statusCode === 403 || probe.statusCode === 401)) {
+      isLivenessOk = true;
+      reasons.push(`source URL verified live at fetch time (HTTP ${probe.statusCode} anti-bot challenge)`);
     } else {
       isLow = true;
       reasons.push('source URL unreachable at fetch time');
@@ -332,6 +335,7 @@ export async function runDiscoveryPipeline(options: {
         title: candidate.title,
         type: candidate.type,
         conference_tier: candidate.conference_tier || null,
+        subfield: candidate.subfield || null,
         organizer: candidate.organizer,
         start_date: candidate.start_date,
         end_date: candidate.end_date,

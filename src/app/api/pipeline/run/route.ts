@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { runDiscoveryPipeline } from '@/lib/pipeline';
 import { verifyCronSecret, getAuthenticatedUser } from '@/lib/serverAuth';
+import { recordPipelineRunTime, setPipelineRunningStatus } from '@/lib/refreshScheduler';
 
 // Allow Vercel Cron or authenticated manual trigger
 export async function POST(request: Request) {
   try {
+    setPipelineRunningStatus(true);
     const authHeader = request.headers.get('authorization');
     const isCronAuthorized = verifyCronSecret(authHeader);
 
@@ -45,6 +47,8 @@ export async function POST(request: Request) {
       triggeredByAdmin: isAdminAuthorized,
     });
 
+    recordPipelineRunTime();
+
     return NextResponse.json({
       success: true,
       message: `Discovery pipeline finished successfully: +${result.log.events_added} added, ${result.log.duplicates_skipped} duplicates skipped, ${result.log.events_archived} archived.`,
@@ -53,6 +57,7 @@ export async function POST(request: Request) {
       updatedEvents: result.updatedOpportunities,
     });
   } catch (error: any) {
+    setPipelineRunningStatus(false);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
@@ -68,14 +73,17 @@ export async function GET(request: Request) {
   }
 
   try {
+    setPipelineRunningStatus(true);
     // Cron execution never passes custom candidates
     const result = await runDiscoveryPipeline();
+    recordPipelineRunTime();
     return NextResponse.json({
       success: true,
       message: `Vercel Cron run completed: +${result.log.events_added} added, ${result.log.duplicates_skipped} duplicates skipped, ${result.log.events_archived} archived.`,
       log: result.log,
     });
   } catch (error: any) {
+    setPipelineRunningStatus(false);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

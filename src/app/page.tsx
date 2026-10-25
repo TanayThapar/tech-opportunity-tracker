@@ -37,6 +37,7 @@ export default function HomePage() {
   const [selectedTier, setSelectedTier] = useState<string | 'all'>('all');
   const [selectedFormat, setSelectedFormat] = useState<OpportunityFormat | 'all'>('all');
   const [selectedCompany, setSelectedCompany] = useState<string | 'all'>('all');
+  const [selectedSubfield, setSelectedSubfield] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyStarred, setOnlyStarred] = useState(false);
   const [onlyAttending, setOnlyAttending] = useState(false);
@@ -45,6 +46,13 @@ export default function HomePage() {
   const [interactionVersion, setInteractionVersion] = useState(0);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [refreshIntervalHours, setRefreshIntervalHours] = useState<number>(6);
+  const [scheduleStatus, setScheduleStatus] = useState<{
+    lastRunAt: string | null;
+    nextRunAt: string | null;
+    intervalHours: number;
+    timeRemainingSeconds: number | null;
+  } | null>(null);
 
   const fetchOpportunities = async () => {
     try {
@@ -62,12 +70,47 @@ export default function HomePage() {
     }
   };
 
+  const fetchScheduleStatus = async () => {
+    try {
+      const res = await fetch('/api/pipeline/schedule');
+      const json = await res.json();
+      if (json.success && json.data) {
+        setScheduleStatus(json.data);
+        if (json.data.intervalHours) {
+          setRefreshIntervalHours(json.data.intervalHours);
+        }
+      }
+    } catch {
+      // Non-fatal
+    }
+  };
+
+  const handleUpdateInterval = async (hours: number) => {
+    setRefreshIntervalHours(hours);
+    try {
+      await fetch('/api/pipeline/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intervalHours: hours }),
+      });
+      fetchScheduleStatus();
+    } catch {
+      // Ignore
+    }
+  };
+
   useEffect(() => {
     fetchOpportunities();
+    fetchScheduleStatus();
+
+    const timer = setInterval(() => {
+      fetchScheduleStatus();
+    }, 60000);
 
     const handleInteractionChange = () => setInteractionVersion(v => v + 1);
     window.addEventListener('techradar_interaction_change', handleInteractionChange);
     return () => {
+      clearInterval(timer);
       window.removeEventListener('techradar_interaction_change', handleInteractionChange);
     };
   }, []);
@@ -110,6 +153,24 @@ export default function HomePage() {
     return Array.from(set).sort();
   }, [opportunities]);
 
+  const subfieldList = useMemo(() => {
+    const set = new Set<string>();
+    opportunities.forEach(o => {
+      if (o.subfield) set.add(o.subfield);
+    });
+    [
+      'AI / Machine Learning',
+      'Systems & Architecture',
+      'Security & Privacy',
+      'Software Engineering & PL',
+      'Databases & Data Mining',
+      'Computer Networks & Mobile',
+      'Theory & Algorithms',
+      'HCI & Computer Graphics',
+    ].forEach(s => set.add(s));
+    return Array.from(set).sort();
+  }, [opportunities]);
+
   // Closing soon calculations (deadlines approaching within 45 days)
   const closingSoonItems = useMemo(() => {
     const today = new Date();
@@ -140,6 +201,7 @@ export default function HomePage() {
     return opportunities.filter(item => {
       if (selectedType !== 'all' && item.type !== selectedType) return false;
       if (selectedTier !== 'all' && item.conference_tier !== selectedTier) return false;
+      if (selectedSubfield !== 'all' && item.subfield !== selectedSubfield) return false;
       if (selectedFormat !== 'all' && item.format !== selectedFormat) return false;
       if (selectedCompany !== 'all') {
         const itemCompany = item.company || (item.type === 'job' ? item.organizer : null);
@@ -155,8 +217,9 @@ export default function HomePage() {
         const matchesCompany = (item.company || '').toLowerCase().includes(q);
         const matchesDesc = item.description.toLowerCase().includes(q);
         const matchesTier = item.conference_tier?.toLowerCase().includes(q);
+        const matchesSubfield = (item.subfield || '').toLowerCase().includes(q);
         const matchesLocation = (item.location || '').toLowerCase().includes(q);
-        if (!matchesTitle && !matchesOrg && !matchesCompany && !matchesDesc && !matchesTier && !matchesLocation) {
+        if (!matchesTitle && !matchesOrg && !matchesCompany && !matchesDesc && !matchesTier && !matchesSubfield && !matchesLocation) {
           return false;
         }
       }
@@ -166,6 +229,7 @@ export default function HomePage() {
     opportunities,
     selectedType,
     selectedTier,
+    selectedSubfield,
     selectedFormat,
     selectedCompany,
     searchQuery,
@@ -225,15 +289,32 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Manual Refresh */}
+            {/* Scraper Refresh Interval Controls */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#111620] border border-slate-800 text-xs text-slate-300">
+              <span className="flex h-2 w-2 rounded-full bg-lime-400 animate-pulse" />
+              <span className="font-mono text-slate-400 hidden sm:inline">Interval:</span>
+              <select
+                value={refreshIntervalHours}
+                onChange={e => handleUpdateInterval(Number(e.target.value))}
+                className="bg-[#0c1015] border border-slate-700 rounded px-1.5 py-0.5 text-xs text-lime-400 font-mono cursor-pointer focus:outline-none focus:border-lime-400"
+                title="Configured automated scraping refresh interval"
+              >
+                <option value={1}>Every 1h</option>
+                <option value={6}>Every 6h</option>
+                <option value={12}>Every 12h</option>
+                <option value={24}>Every 24h</option>
+              </select>
+            </div>
+
+            {/* Run Web Scrapers Now */}
             <button
-              onClick={fetchOpportunities}
-              disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
-              title="Refresh radar opportunities"
+              onClick={handleTriggerPipeline}
+              disabled={isRunningPipeline}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lime-400 hover:bg-lime-300 text-slate-950 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+              title="Scrape and crawl live web feeds (MLH, SimplifyJobs, CCF Deadlines, AI Deadlines)"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-lime-400 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isRunningPipeline ? 'animate-spin' : ''}`} />
+              <span>{isRunningPipeline ? 'Scraping...' : 'Scrape Feeds Now'}</span>
             </button>
 
             {/* Saved Watchlist Filter */}
@@ -381,10 +462,13 @@ export default function HomePage() {
           onSelectFormat={setSelectedFormat}
           selectedCompany={selectedCompany}
           onSelectCompany={setSelectedCompany}
+          selectedSubfield={selectedSubfield}
+          onSelectSubfield={setSelectedSubfield}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           tierList={tierList}
           companyList={companyList}
+          subfieldList={subfieldList}
         />
 
         {/* Main Content Area */}
@@ -398,13 +482,14 @@ export default function HomePage() {
             <Compass className="w-10 h-10 mx-auto text-slate-600" />
             <h3 className="text-sm font-bold text-white">No opportunities match the selected filters</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Try adjusting your category, work mode, or search terms, or trigger a discovery crawl.
+              Try adjusting your category, computer science field, or search terms, or trigger a scraper crawl.
             </p>
             <div className="pt-2 flex justify-center gap-2">
               <button
                 onClick={() => {
                   setSelectedType('all');
                   setSelectedTier('all');
+                  setSelectedSubfield('all');
                   setSelectedFormat('all');
                   setSelectedCompany('all');
                   setSearchQuery('');

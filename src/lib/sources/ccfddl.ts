@@ -49,6 +49,20 @@ export interface CCFConferenceItem {
   confs?: CCFConferenceEdition[];
 }
 
+export function mapCCFSubToCategory(sub?: string): string {
+  if (!sub) return 'General CS';
+  const s = sub.trim().toUpperCase();
+  if (s === 'AI' || s === 'ML') return 'AI / Machine Learning';
+  if (s === 'SYS' || s === 'TC' || s === 'ARCH') return 'Systems & Architecture';
+  if (s === 'SEC' || s === 'SC' || s === 'CRYPTO') return 'Security & Privacy';
+  if (s === 'SE' || s === 'PL') return 'Software Engineering & PL';
+  if (s === 'DB' || s === 'DM' || s === 'IR') return 'Databases & Data Mining';
+  if (s === 'NW' || s === 'NET') return 'Computer Networks & Mobile';
+  if (s === 'TH' || s === 'THEORY') return 'Theory & Algorithms';
+  if (s === 'HCI' || s === 'CG') return 'HCI & Computer Graphics';
+  return 'General CS';
+}
+
 /**
  * Normalizes CORE ranking to standard conference_tier string.
  */
@@ -209,6 +223,7 @@ export async function fetchCCFDeadlines(): Promise<RawDiscoveredItem[]> {
         title,
         type: 'conference',
         conference_tier: confTier || 'Industry / Non-Academic',
+        subfield: mapCCFSubToCategory(conf.sub),
         organizer: conf.sub ? `CCF-${conf.sub} / ${conf.title} Steering Committee` : `${conf.title} Committee`,
         start_date: startDate || `${edition.year}-01-01`,
         end_date: endDate || `${edition.year}-12-31`,

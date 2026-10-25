@@ -224,9 +224,31 @@ export default function CalendarView({ opportunities, onRefresh }: CalendarViewP
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {format(currentMonth, 'MMMM yyyy')}
-          </h2>
+          <select
+            value={format(currentMonth, 'yyyy-MM')}
+            onChange={e => {
+              const [y, m] = e.target.value.split('-').map(Number);
+              setCurrentMonth(new Date(y, m - 1, 1));
+            }}
+            className="text-base font-bold bg-transparent text-gray-900 dark:text-white border-b border-dashed border-gray-400 dark:border-gray-600 focus:outline-none focus:border-blue-500 py-0.5 cursor-pointer"
+            title="Jump directly to any month in 2026 or 2027"
+          >
+            <option value="2026-10" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">October 2026</option>
+            <option value="2026-11" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">November 2026</option>
+            <option value="2026-12" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">December 2026</option>
+            <option value="2027-01" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">January 2027</option>
+            <option value="2027-02" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">February 2027</option>
+            <option value="2027-03" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">March 2027</option>
+            <option value="2027-04" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">April 2027</option>
+            <option value="2027-05" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">May 2027</option>
+            <option value="2027-06" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">June 2027</option>
+            <option value="2027-07" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">July 2027</option>
+            <option value="2027-08" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">August 2027</option>
+            <option value="2027-09" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">September 2027</option>
+            <option value="2027-10" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">October 2027</option>
+            <option value="2027-11" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">November 2027</option>
+            <option value="2027-12" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">December 2027</option>
+          </select>
           {onRefresh && (
             <button
               onClick={onRefresh}

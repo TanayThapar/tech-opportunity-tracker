@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const type = searchParams.get('type') || undefined;
     const tier = searchParams.get('tier') || undefined;
     const company = searchParams.get('company') || undefined;
+    const subfield = searchParams.get('subfield') || undefined;
     const requestedStatus = searchParams.get('status') || 'published';
 
     // Problem 2: Only published items are public.
@@ -34,6 +35,7 @@ export async function GET(request: Request) {
       type,
       tier,
       company,
+      subfield,
     });
 
     return NextResponse.json({ success: true, count: events.length, data: events });

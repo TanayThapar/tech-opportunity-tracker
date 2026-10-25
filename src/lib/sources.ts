@@ -20,6 +20,7 @@ export interface RawDiscoveredItem {
   title: string;
   type: OpportunityType;
   conference_tier?: string | null;
+  subfield?: string | null;
   organizer: string;
   start_date: string;
   end_date: string;

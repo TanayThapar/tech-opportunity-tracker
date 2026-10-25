@@ -124,6 +124,11 @@ export default function OpportunityCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <TypeBadge type={opportunity.type} />
             {opportunity.type === 'conference' && <TierBadge tier={opportunity.conference_tier} />}
+            {opportunity.subfield && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">
+                {opportunity.subfield}
+              </span>
+            )}
             <ConfidenceBadge confidence={opportunity.discovery_confidence} />
             {opportunity.approved_by && (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-lime-950/60 text-lime-300 border border-lime-500/40">

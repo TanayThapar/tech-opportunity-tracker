@@ -1,6 +1,7 @@
 /**
  * Date parsing utilities for parsing natural language conference date strings
- * (e.g. "February 16-23, 2027", "May 31-June 2, 2026", "October 25, 2026") into ISO date strings.
+ * (e.g. "February 16-23, 2027", "May 31-June 2, 2026", "October 25, 2026", "July 2027", "Summer 2027")
+ * into standard ISO date strings.
  */
 
 const MONTHS: Record<string, number> = {
@@ -24,6 +25,10 @@ function formatIso(year: number, monthZeroIndexed: number, day: number): string 
   return `${year}-${m}-${d}`;
 }
 
+function getDaysInMonth(year: number, monthZeroIndexed: number): number {
+  return new Date(Date.UTC(year, monthZeroIndexed + 1, 0)).getUTCDate();
+}
+
 export function parseConferenceDateRange(
   dateStr?: string | null,
   fallbackYear?: number
@@ -33,7 +38,12 @@ export function parseConferenceDateRange(
   }
 
   const clean = dateStr.trim();
-  if (clean.toLowerCase() === 'tbd' || clean.toLowerCase() === 'tba' || clean.toLowerCase() === 'cancelled') {
+  if (
+    clean.toLowerCase() === 'tbd' ||
+    clean.toLowerCase() === 'tba' ||
+    clean.toLowerCase() === 'cancelled' ||
+    clean.toLowerCase() === 'canceled'
+  ) {
     return { startDate: null, endDate: null, isAmbiguous: true };
   }
 
@@ -84,7 +94,7 @@ export function parseConferenceDateRange(
     }
   }
 
-  // Pattern 3: Single date, e.g. "October 25, 2026" or "May 10 2027"
+  // Pattern 3: Single day date, e.g. "October 25, 2026" or "May 10 2027"
   const singleDate = clean.match(/([a-zA-Z]+)\s+(\d{1,2})/);
   if (singleDate) {
     const m = singleDate[1].toLowerCase();
@@ -93,6 +103,54 @@ export function parseConferenceDateRange(
       const day = parseInt(singleDate[2], 10);
       const iso = formatIso(year, month, day);
       return { startDate: iso, endDate: iso, isAmbiguous: false };
+    }
+  }
+
+  // Pattern 4: Month Range without specific days, e.g. "June - July 2027" or "June-July 2027"
+  const monthToMonthRange = clean.match(/([a-zA-Z]+)\s*[-–—]\s*([a-zA-Z]+)/);
+  if (monthToMonthRange) {
+    const m1 = monthToMonthRange[1].toLowerCase();
+    const m2 = monthToMonthRange[2].toLowerCase();
+    if (m1 in MONTHS && m2 in MONTHS) {
+      const startMonth = MONTHS[m1];
+      const endMonth = MONTHS[m2];
+      const endYear = endMonth < startMonth ? year + 1 : year;
+      const lastDay = getDaysInMonth(endYear, endMonth);
+      return {
+        startDate: formatIso(year, startMonth, 1),
+        endDate: formatIso(endYear, endMonth, lastDay),
+        isAmbiguous: false,
+      };
+    }
+  }
+
+  // Pattern 5: Month and Year only, e.g. "July 2027" or "July, 2027" or "October 2026"
+  const monthOnly = clean.match(/^([a-zA-Z]+)(?:,?\s+\d{4})?$/);
+  if (monthOnly) {
+    const m = monthOnly[1].toLowerCase();
+    if (m in MONTHS) {
+      const month = MONTHS[m];
+      const lastDay = getDaysInMonth(year, month);
+      return {
+        startDate: formatIso(year, month, 1),
+        endDate: formatIso(year, month, lastDay),
+        isAmbiguous: false,
+      };
+    }
+  }
+
+  // Pattern 6: Academic seasons, e.g. "Summer 2027", "Fall 2026", "Spring 2027", "Winter 2027"
+  const seasonMatch = clean.match(/\b(summer|fall|autumn|spring|winter)\b/i);
+  if (seasonMatch) {
+    const season = seasonMatch[1].toLowerCase();
+    if (season === 'summer') {
+      return { startDate: formatIso(year, 5, 1), endDate: formatIso(year, 7, 31), isAmbiguous: false };
+    } else if (season === 'fall' || season === 'autumn') {
+      return { startDate: formatIso(year, 8, 1), endDate: formatIso(year, 10, 30), isAmbiguous: false };
+    } else if (season === 'spring') {
+      return { startDate: formatIso(year, 2, 1), endDate: formatIso(year, 4, 31), isAmbiguous: false };
+    } else if (season === 'winter') {
+      return { startDate: formatIso(year, 0, 1), endDate: formatIso(year, 1, 28), isAmbiguous: false };
     }
   }
 

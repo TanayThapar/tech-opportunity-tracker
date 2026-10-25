@@ -40,6 +40,7 @@ export interface TechOpportunity {
   title: string;
   type: OpportunityType;
   conference_tier?: string | null; // e.g. 'Core A*', 'Core A', 'Core B', 'Core C', 'Industry / Non-Academic'
+  subfield?: string | null; // e.g. 'AI / Machine Learning', 'Systems & Architecture', 'Security & Privacy', etc.
   organizer: string;
   start_date: string; // ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:mm:ssZ
   end_date: string;   // ISO format or deadline for internships/jobs

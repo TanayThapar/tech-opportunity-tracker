@@ -140,6 +140,7 @@ export async function fetchAIDeadlines(): Promise<RawDiscoveredItem[]> {
       title,
       type: 'conference',
       conference_tier: 'Core A*', // Most AI-deadlines entries are top-tier AI/ML conferences
+      subfield: 'AI / Machine Learning',
       organizer: item.full_name ? `${item.title} Organizing Committee` : 'AI Conference Committee',
       start_date: startDate,
       end_date: endDate,

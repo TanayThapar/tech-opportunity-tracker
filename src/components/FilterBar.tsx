@@ -1,6 +1,6 @@
 import React from 'react';
 import { OpportunityType, OpportunityFormat } from '@/types';
-import { Search, Layers, Globe, Building2, X } from 'lucide-react';
+import { Search, Layers, Globe, Building2, BookOpen, X } from 'lucide-react';
 
 interface FilterBarProps {
   selectedType: OpportunityType | 'all';
@@ -11,10 +11,13 @@ interface FilterBarProps {
   onSelectFormat: (format: OpportunityFormat | 'all') => void;
   selectedCompany?: string | 'all';
   onSelectCompany?: (company: string | 'all') => void;
+  selectedSubfield?: string | 'all';
+  onSelectSubfield?: (subfield: string | 'all') => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   tierList: string[];
   companyList?: string[];
+  subfieldList?: string[];
 }
 
 export default function FilterBar({
@@ -26,10 +29,13 @@ export default function FilterBar({
   onSelectFormat,
   selectedCompany = 'all',
   onSelectCompany,
+  selectedSubfield = 'all',
+  onSelectSubfield,
   searchQuery,
   onSearchChange,
   tierList,
   companyList = [],
+  subfieldList = [],
 }: FilterBarProps) {
   const types: { id: OpportunityType | 'all'; label: string }[] = [
     { id: 'all', label: 'All Categories' },
@@ -134,6 +140,26 @@ export default function FilterBar({
             ))}
           </select>
         </div>
+
+        {/* CS Subfield / Track Selector */}
+        {subfieldList.length > 0 && onSelectSubfield && (
+          <div className="sm:col-span-2 relative">
+            <BookOpen className="absolute left-3 top-2.5 w-3.5 h-3.5 text-cyan-400 pointer-events-none" />
+            <select
+              value={selectedSubfield}
+              onChange={e => onSelectSubfield(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs bg-[#0c1015] border border-cyan-800/60 rounded-lg focus:outline-none focus:border-cyan-400 text-cyan-200 cursor-pointer"
+              title="Filter conferences by field of study"
+            >
+              <option value="all" className="bg-[#111620]">All CS Fields</option>
+              {subfieldList.map(sub => (
+                <option key={sub} value={sub} className="bg-[#111620]">
+                  {sub}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Employer / Organizer */}
         {companyList.length > 0 && onSelectCompany && (

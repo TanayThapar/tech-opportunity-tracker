@@ -65,6 +65,7 @@ export async function getOpportunities(filter?: {
   type?: string;
   company?: string;
   tier?: string;
+  subfield?: string;
 }): Promise<TechOpportunity[]> {
   const supabase = getSupabaseClient();
 
@@ -81,6 +82,9 @@ export async function getOpportunities(filter?: {
     }
     if (filter?.tier && filter.tier !== 'all') {
       query = query.eq('conference_tier', filter.tier);
+    }
+    if (filter?.subfield && filter.subfield !== 'all') {
+      query = query.eq('subfield', filter.subfield);
     }
 
     const { data, error } = await query.order('start_date', { ascending: true });
@@ -127,6 +131,9 @@ export async function getOpportunities(filter?: {
   }
   if (filter?.tier && filter.tier !== 'all') {
     list = list.filter(o => o.conference_tier === filter.tier);
+  }
+  if (filter?.subfield && filter.subfield !== 'all') {
+    list = list.filter(o => o.subfield === filter.subfield);
   }
 
   return list.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
