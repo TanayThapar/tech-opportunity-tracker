@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { runDiscoveryPipeline } from '@/lib/pipeline';
 import { _resetMemoryStoreForTests } from '@/lib/store';
-import { AIProvider, sanitizeUntrustedText, AIExtractedOpportunitySchema } from '@/lib/ai/provider';
+import { AIProvider, sanitizeUntrustedText, AIExtractedOpportunitySchema, extractOpportunityWithGemini } from '@/lib/ai/provider';
 import { RawDiscoveredItem } from '@/lib/sources';
 
 describe('Job & AI Handling Security', () => {
@@ -89,5 +89,52 @@ describe('Job & AI Handling Security', () => {
     expect(job).toBeDefined();
     expect(job?.discovery_confidence).toBe('low');
     expect(job?.status).toBe('needs_review'); // Quarantined
+  });
+
+  it('rejects Gemini extraction when API key is missing or invalid', async () => {
+    const res = await extractOpportunityWithGemini('', 'https://example.com', 'some content');
+    expect(res.item).toBeNull();
+    expect(res.error).toContain('Gemini API Key is required');
+  });
+
+  it('correctly processes and structures Gemini extraction response', async () => {
+    const mockJson = {
+      title: 'EMNLP 2026: Conference on Empirical Methods in NLP',
+      type: 'conference',
+      conference_tier: 'Core A*',
+      organizer: 'ACL / SIGDAT',
+      start_date: '2026-10-25',
+      end_date: '2026-10-27',
+      submission_deadline: '2026-05-15',
+      format: 'hybrid',
+      location: 'Budapest, Hungary',
+      description: 'Premier empirical NLP conference covering foundation models and evaluation.',
+    };
+
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: JSON.stringify(mockJson) }],
+            },
+          },
+        ],
+      }),
+    } as any);
+
+    try {
+      const res = await extractOpportunityWithGemini('AIzaSyTestKey123456789', 'https://2026.emnlp.org/', 'EMNLP announcement text');
+      expect(res.item).not.toBeNull();
+      expect(res.item?.title).toBe(mockJson.title);
+      expect(res.item?.type).toBe('conference');
+      expect(res.item?.start_date).toBe('2026-10-25');
+      expect(res.item?.origin).toBe('ai_extracted');
+      expect(res.item?.force_low_confidence).toBe(true);
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });
