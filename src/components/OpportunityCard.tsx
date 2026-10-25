@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { TechOpportunity, EventComment } from '@/types';
 import { TypeBadge, TierBadge, FormatBadge, ConfidenceBadge, SocietyBadge, CATEGORY_COLORS } from './Badge';
 import { detectSocieties } from '@/lib/societyUtils';
+import { extractSkills, calculateSkillMatch } from '@/lib/skillMatcher';
 import { getInteraction, toggleStar, toggleParticipating, addComment } from '@/lib/interactions';
 import {
   ExternalLink,
@@ -19,6 +20,8 @@ import {
   ShieldCheck,
   Clock,
   Bookmark,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -27,6 +30,9 @@ interface OpportunityCardProps {
   onUpdateConfidence?: (id: string, newConfidence: 'high' | 'low') => void;
   showReviewActions?: boolean;
   onApprove?: (id: string) => void;
+  userSkills?: string[];
+  isCollision?: boolean;
+  collisionSeverity?: 'low' | 'medium' | 'critical';
 }
 
 export default function OpportunityCard({
@@ -34,6 +40,9 @@ export default function OpportunityCard({
   onUpdateConfidence,
   showReviewActions = false,
   onApprove,
+  userSkills = [],
+  isCollision = false,
+  collisionSeverity = 'low',
 }: OpportunityCardProps) {
   const [isStarred, setIsStarred] = useState(false);
   const [isParticipating, setIsParticipating] = useState(false);
@@ -107,6 +116,11 @@ export default function OpportunityCard({
   const isStaleOrUnreachable =
     opportunity.link_status === 'unreachable' || opportunity.listing_status === 'stale';
 
+  const skills = opportunity.skills && opportunity.skills.length > 0
+    ? opportunity.skills
+    : extractSkills(opportunity);
+  const match = calculateSkillMatch(skills, userSkills);
+
   return (
     <div
       className={`rounded-xl p-5 font-sans transition-all duration-200 border bg-[#111620] flex flex-col justify-between relative group shadow-sm hover:shadow-md ${
@@ -114,6 +128,8 @@ export default function OpportunityCard({
           ? 'border-lime-500/80 ring-1 ring-lime-500/40'
           : isStarred
           ? 'border-amber-500/80 ring-1 ring-amber-500/30'
+          : match.percentage >= 60
+          ? 'border-lime-400/70 ring-1 ring-lime-400/30'
           : isLowConfidence
           ? 'border-amber-500/30'
           : `${categoryConfig.border} hover:border-slate-600`
@@ -131,6 +147,28 @@ export default function OpportunityCard({
             {opportunity.subfield && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">
                 {opportunity.subfield}
+              </span>
+            )}
+            {match.percentage > 0 && (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-lime-950/90 text-lime-300 border border-lime-400/60 shadow-sm"
+                title={`${match.matchCount} skill(s) match your tech stack`}
+              >
+                <Sparkles className="w-2.5 h-2.5 text-lime-400" />
+                {match.percentage}% Match
+              </span>
+            )}
+            {isCollision && (
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase border shadow-sm ${
+                  collisionSeverity === 'critical'
+                    ? 'bg-rose-950 text-rose-300 border-rose-500/50'
+                    : 'bg-amber-950 text-amber-300 border-amber-500/50'
+                }`}
+                title="Deadline collides with other submissions this week"
+              >
+                <Zap className="w-2.5 h-2.5" />
+                Crunch Alert
               </span>
             )}
             <ConfidenceBadge confidence={opportunity.discovery_confidence} />
@@ -220,6 +258,27 @@ export default function OpportunityCard({
         <p className="text-xs text-slate-300 mt-3 line-clamp-3 leading-relaxed">
           {opportunity.description}
         </p>
+
+        {/* Tech Stack Skills */}
+        {skills.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 mt-2.5">
+            {skills.map(s => {
+              const isMatched = match.matchingSkills.some(m => m.toLowerCase() === s.toLowerCase());
+              return (
+                <span
+                  key={s}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                    isMatched
+                      ? 'bg-lime-950/80 text-lime-300 border border-lime-400/60 font-bold'
+                      : 'bg-slate-900 text-slate-400 border border-slate-800'
+                  }`}
+                >
+                  {s}
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* Job Requisition Provenance Note */}
         {opportunity.type === 'job' && (

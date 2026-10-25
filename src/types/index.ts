@@ -58,6 +58,7 @@ export interface TechOpportunity {
   starred_count?: number;
   participants_count?: number;
   contributors?: Contributor[]; // Signed-in users tagged as contributors/co-participants
+  skills?: string[]; // Extracted / associated tech stack skills
 
   // Provenance (Problem 2)
   origin?: OpportunityOrigin;
@@ -100,6 +101,17 @@ export interface FilterOptions {
   company?: string | 'all';
   searchQuery?: string;
   viewExpired?: boolean;
+}
+
+export interface DeadlineCollisionCluster {
+  id: string;
+  startDate: string;
+  endDate: string;
+  daysSpan: number;
+  severity: 'low' | 'medium' | 'critical';
+  opportunities: TechOpportunity[];
+  title: string;
+  message: string;
 }
 
 // Problem 7 & 8 Types

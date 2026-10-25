@@ -1,7 +1,7 @@
 import React from 'react';
 import { OpportunityType, OpportunityFormat } from '@/types';
 import { SocietyFilter } from '@/lib/societyUtils';
-import { Search, Layers, Globe, Building2, BookOpen, X, Award } from 'lucide-react';
+import { Search, Layers, Globe, Building2, BookOpen, X, Award, Calendar, Code2, Sparkles } from 'lucide-react';
 
 interface FilterBarProps {
   selectedType: OpportunityType | 'all';
@@ -22,6 +22,11 @@ interface FilterBarProps {
   tierList: string[];
   companyList?: string[];
   subfieldList?: string[];
+  onOpenCalendarSync?: () => void;
+  onOpenSkillPicker?: () => void;
+  userSkillsCount?: number;
+  onlyMatchingSkills?: boolean;
+  onToggleMatchingSkills?: () => void;
 }
 
 export default function FilterBar({
@@ -43,6 +48,11 @@ export default function FilterBar({
   tierList,
   companyList = [],
   subfieldList = [],
+  onOpenCalendarSync,
+  onOpenSkillPicker,
+  userSkillsCount = 0,
+  onlyMatchingSkills = false,
+  onToggleMatchingSkills,
 }: FilterBarProps) {
   const types: { id: OpportunityType | 'all'; label: string }[] = [
     { id: 'all', label: 'All Categories' },
@@ -93,77 +103,131 @@ export default function FilterBar({
         })}
       </div>
 
-      {/* Society / Professional Organization Quick Filters (ACM, IEEE, USENIX) */}
-      {onSelectSociety && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs text-slate-400 scrollbar-none">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Award className="w-3.5 h-3.5 text-lime-400" /> Society:
-          </span>
-          <div className="flex items-center gap-1.5 flex-nowrap">
-            <button
-              onClick={() => onSelectSociety('all')}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all cursor-pointer ${
-                selectedSociety === 'all'
-                  ? 'bg-slate-700 text-white border-slate-500 font-semibold shadow-sm'
-                  : 'bg-[#0c1015] text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
-              }`}
-            >
-              All Societies
-            </button>
-            <button
-              onClick={() => onSelectSociety('acm')}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedSociety === 'acm'
-                  ? 'bg-sky-950 border-sky-400 text-sky-200 ring-1 ring-sky-400/50 shadow-sm'
-                  : 'bg-[#0c1015] text-sky-400/90 border-sky-900/60 hover:bg-sky-950/40 hover:text-sky-200'
-              }`}
-              title="Show ACM sponsored conferences, workshops, and symposiums"
-            >
-              <span className="w-2 h-2 rounded-full bg-sky-400" />
-              ACM Events
-              {societyCounts && societyCounts.acm > 0 && (
-                <span className="font-mono text-[10px] text-sky-300 font-bold bg-sky-900/50 px-1 py-0.2 rounded">
-                  {societyCounts.acm}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => onSelectSociety('ieee')}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedSociety === 'ieee'
-                  ? 'bg-blue-950 border-blue-400 text-blue-200 ring-1 ring-blue-400/50 shadow-sm'
-                  : 'bg-[#0c1015] text-blue-400/90 border-blue-900/60 hover:bg-blue-950/40 hover:text-blue-200'
-              }`}
-              title="Show IEEE sponsored conferences, workshops, and symposiums"
-            >
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
-              IEEE Events
-              {societyCounts && societyCounts.ieee > 0 && (
-                <span className="font-mono text-[10px] text-blue-300 font-bold bg-blue-900/50 px-1 py-0.2 rounded">
-                  {societyCounts.ieee}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => onSelectSociety('usenix')}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedSociety === 'usenix'
-                  ? 'bg-indigo-950 border-indigo-400 text-indigo-200 ring-1 ring-indigo-400/50 shadow-sm'
-                  : 'bg-[#0c1015] text-indigo-400/90 border-indigo-900/60 hover:bg-indigo-950/40 hover:text-indigo-200'
-              }`}
-              title="Show USENIX Association conferences and workshops"
-            >
-              <span className="w-2 h-2 rounded-full bg-indigo-400" />
-              USENIX
-              {societyCounts && societyCounts.usenix > 0 && (
-                <span className="font-mono text-[10px] text-indigo-300 font-bold bg-indigo-900/50 px-1 py-0.2 rounded">
-                  {societyCounts.usenix}
-                </span>
-              )}
-            </button>
+      {/* Society / Professional Organization Quick Filters (ACM, IEEE, USENIX) + Tools */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-2.5">
+        {onSelectSociety && (
+          <div className="flex items-center gap-1.5 overflow-x-auto text-xs text-slate-400 scrollbar-none">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
+              <Award className="w-3.5 h-3.5 text-lime-400" /> Society:
+            </span>
+            <div className="flex items-center gap-1.5 flex-nowrap">
+              <button
+                onClick={() => onSelectSociety('all')}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all cursor-pointer ${
+                  selectedSociety === 'all'
+                    ? 'bg-slate-700 text-white border-slate-500 font-semibold shadow-sm'
+                    : 'bg-[#0c1015] text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => onSelectSociety('acm')}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedSociety === 'acm'
+                    ? 'bg-sky-950 border-sky-400 text-sky-200 ring-1 ring-sky-400/50 shadow-sm'
+                    : 'bg-[#0c1015] text-sky-400/90 border-sky-900/60 hover:bg-sky-950/40 hover:text-sky-200'
+                }`}
+                title="Show ACM sponsored conferences, workshops, and symposiums"
+              >
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                ACM
+                {societyCounts && societyCounts.acm > 0 && (
+                  <span className="font-mono text-[10px] text-sky-300 font-bold bg-sky-900/50 px-1 py-0.2 rounded">
+                    {societyCounts.acm}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => onSelectSociety('ieee')}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedSociety === 'ieee'
+                    ? 'bg-blue-950 border-blue-400 text-blue-200 ring-1 ring-blue-400/50 shadow-sm'
+                    : 'bg-[#0c1015] text-blue-400/90 border-blue-900/60 hover:bg-blue-950/40 hover:text-blue-200'
+                }`}
+                title="Show IEEE sponsored conferences, workshops, and symposiums"
+              >
+                <span className="w-2 h-2 rounded-full bg-blue-400" />
+                IEEE
+                {societyCounts && societyCounts.ieee > 0 && (
+                  <span className="font-mono text-[10px] text-blue-300 font-bold bg-blue-900/50 px-1 py-0.2 rounded">
+                    {societyCounts.ieee}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => onSelectSociety('usenix')}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                  selectedSociety === 'usenix'
+                    ? 'bg-indigo-950 border-indigo-400 text-indigo-200 ring-1 ring-indigo-400/50 shadow-sm'
+                    : 'bg-[#0c1015] text-indigo-400/90 border-indigo-900/60 hover:bg-indigo-950/40 hover:text-indigo-200'
+                }`}
+                title="Show USENIX Association conferences and workshops"
+              >
+                <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                USENIX
+                {societyCounts && societyCounts.usenix > 0 && (
+                  <span className="font-mono text-[10px] text-indigo-300 font-bold bg-indigo-900/50 px-1 py-0.2 rounded">
+                    {societyCounts.usenix}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
+        )}
+
+        {/* Feature Action Buttons: Calendar Feed & Tech Stack Matcher */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          {onOpenSkillPicker && (
+            <button
+              type="button"
+              onClick={onOpenSkillPicker}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                userSkillsCount > 0
+                  ? 'bg-lime-950 border-lime-400 text-lime-300 ring-1 ring-lime-400/30'
+                  : 'bg-[#0c1015] border-slate-700 text-slate-300 hover:text-white hover:border-slate-600'
+              }`}
+              title="Select your skills & framework specialties"
+            >
+              <Code2 className="w-3.5 h-3.5 text-lime-400" />
+              <span>Tech Stack</span>
+              {userSkillsCount > 0 ? (
+                <span className="font-mono text-[10px] bg-lime-400 text-slate-950 font-bold px-1.5 py-0.2 rounded-full">
+                  {userSkillsCount}
+                </span>
+              ) : null}
+            </button>
+          )}
+
+          {userSkillsCount > 0 && onToggleMatchingSkills && (
+            <button
+              type="button"
+              onClick={onToggleMatchingSkills}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1 ${
+                onlyMatchingSkills
+                  ? 'bg-lime-400 text-slate-950 border-lime-400 font-bold shadow-sm'
+                  : 'bg-[#0c1015] border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+              }`}
+              title="Filter opportunities matching your tech stack"
+            >
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>Matches Only</span>
+            </button>
+          )}
+
+          {onOpenCalendarSync && (
+            <button
+              type="button"
+              onClick={onOpenCalendarSync}
+              className="px-2.5 py-1 rounded-md text-xs font-semibold border border-blue-500/50 bg-blue-950/40 text-blue-300 hover:bg-blue-900/50 hover:text-white transition-all cursor-pointer flex items-center gap-1"
+              title="Get live iCalendar / WebCal feed link for Google Calendar, Apple Calendar, Outlook"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-400" />
+              <span>Sync Calendar</span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Query, Tier, Company & Format Selectors */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-2 border-t border-slate-800/80">

@@ -14,7 +14,22 @@ Live Production: [https://tech-opportunity-tracker.vercel.app](https://tech-oppo
 - **Interactive Calendar View**: Full monthly grid with color-coded category pills, urgency alerts, detail drawer, and a **Month-Year selector dropdown (Oct 2026 – Dec 2027)** for jumping directly to any future conference month.
 - **Card & Calendar Toggle**: Switch between visual opportunity cards and monthly calendar view with a single click.
 
-### 2. Dedicated ACM & IEEE Conferences and Workshops
+### 2. Novelty Engines: Collision Radar, Live Calendar Feed & Tech Stack Matcher
+- **Feature #1: Personal Deadline Collision Radar**:
+  - Automatically identifies high-stress clusters where 2 or more paper submission deadlines or job application dates collide within a tight window (e.g. 5–6 days).
+  - Categorizes severity (`Critical Crunch` with pulse animation, `High Congestion`, `Deadline Overlap`).
+  - Displays a dedicated **Collision Alert Banner** above the main feed and dynamic **⚡ Crunch Alert** badges on colliding opportunity cards.
+- **Feature #2: Live RFC 5545 iCalendar (`.ics`) & WebCal Subscription Feed**:
+  - Live, dynamic calendar feed endpoint at [`/api/calendar/feed`](./src/app/api/calendar/feed/route.ts).
+  - RFC 5545 compliant with line folding (75 octets), CRLF delimiters, character escaping, and standard `VEVENT` definitions.
+  - Automatically equips each submission deadline with dual `VALARM` notifications (24-hour urgent warning and 7-day preparation reminder).
+  - 1-click **"Sync Calendar"** modal supporting **Google Calendar**, **Apple Calendar**, **Microsoft Outlook**, and offline `.ics` downloads with customizable presets (All, Saved Deadlines, ACM/IEEE, Conferences).
+- **Feature #7: Skill & Tech Stack Matcher Engine**:
+  - Automatically extracts core technical skills, frameworks, and domains (`Python`, `Rust`, `Go`, `TypeScript`, `PyTorch & Deep Learning`, `LLMs & Generative AI`, `Distributed Systems`, `Kubernetes & Cloud Native`, `Zero-Knowledge & Cryptography`, etc.) from opportunity metadata.
+  - Calculates personalized match percentages against the user's selected tech stack.
+  - Displays **🔥 {X}% Match** badges and skill tags on cards, with a quick **"Matches Only"** filter toggle.
+
+### 3. Dedicated ACM & IEEE Conferences and Workshops
 - **Prominent Society Filters**: One-click quick filter buttons for **ACM Events**, **IEEE Events**, **USENIX**, and **All Societies** with live item count badges.
 - **Visual Society Badges**: Distinctive badges on opportunity cards and calendar entries highlighting ACM (sky-blue), IEEE (deep royal blue), and USENIX (indigo) sponsorships. Joint conferences (e.g., *MICRO*, *ASPLOS*, *ICSE*) display both.
 - **Comprehensive Workshop Catalog**: Dedicated tracking for high-impact workshops including *ACM HotOS*, *ACM HotNets*, *ACM HotStorage*, *ACM WPES*, *ACM AISEC*, *ACM PLAS*, *ACM APSys*, *IEEE SpaAI*, *IEEE DLSP*, *IEEE IWST*, *IEEE SLT*, *IEEE ICRA Workshops*, *IEEE VIS Workshops*, and *IEEE GLOBECOM Workshops*.
@@ -78,7 +93,7 @@ Dedicated track filtering dropdown on the dashboard:
 - **Date Handling**: `date-fns`
 - **Validation**: Zod
 - **Deduplication**: Fast-Levenshtein with normalized title, date, and organizer containment
-- **Testing**: Vitest (66 tests across 14 suites)
+- **Testing**: Vitest (79 tests across 15 suites)
 - **Zero Paid Dependencies**: 100% open-source libraries, free community feeds, and self-hostable tools.
 
 ---

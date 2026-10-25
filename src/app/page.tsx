@@ -6,6 +6,9 @@ import FilterBar from '@/components/FilterBar';
 import OpportunityCard from '@/components/OpportunityCard';
 import CalendarView from '@/components/CalendarView';
 import SubmitOpportunityModal from '@/components/SubmitOpportunityModal';
+import CalendarSubscriptionModal from '@/components/CalendarSubscriptionModal';
+import CollisionRadarBanner from '@/components/CollisionRadarBanner';
+import SkillPickerModal from '@/components/SkillPickerModal';
 import { TechOpportunity, OpportunityType, OpportunityFormat } from '@/types';
 import {
   Calendar,
@@ -28,6 +31,8 @@ import {
 import Link from 'next/link';
 import { SocietyFilter, matchesSociety, getSocietyStats } from '@/lib/societyUtils';
 import { getAllInteractions } from '@/lib/interactions';
+import { detectDeadlineCollisions, getOpportunityCollision } from '@/lib/collisionRadar';
+import { getUserSkills, extractSkills, calculateSkillMatch } from '@/lib/skillMatcher';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
 export default function HomePage() {
@@ -47,6 +52,10 @@ export default function HomePage() {
   const [pipelineToast, setPipelineToast] = useState<string | null>(null);
   const [interactionVersion, setInteractionVersion] = useState(0);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isCalendarSyncOpen, setIsCalendarSyncOpen] = useState(false);
+  const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false);
+  const [userSkills, setUserSkills] = useState<string[]>([]);
+  const [onlyMatchingSkills, setOnlyMatchingSkills] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [refreshIntervalHours, setRefreshIntervalHours] = useState<number>(6);
   const [scheduleStatus, setScheduleStatus] = useState<{
@@ -104,16 +113,21 @@ export default function HomePage() {
   useEffect(() => {
     fetchOpportunities();
     fetchScheduleStatus();
+    setUserSkills(getUserSkills());
 
     const timer = setInterval(() => {
       fetchScheduleStatus();
     }, 60000);
 
     const handleInteractionChange = () => setInteractionVersion(v => v + 1);
+    const handleSkillsChange = () => setUserSkills(getUserSkills());
+
     window.addEventListener('techradar_interaction_change', handleInteractionChange);
+    window.addEventListener('techradar_skills_change', handleSkillsChange);
     return () => {
       clearInterval(timer);
       window.removeEventListener('techradar_interaction_change', handleInteractionChange);
+      window.removeEventListener('techradar_skills_change', handleSkillsChange);
     };
   }, []);
 
@@ -173,6 +187,11 @@ export default function HomePage() {
     return Array.from(set).sort();
   }, [opportunities]);
 
+  // Deadline Collision Clusters (Feature #1)
+  const collisionClusters = useMemo(() => {
+    return detectDeadlineCollisions(opportunities);
+  }, [opportunities]);
+
   // Closing soon calculations (deadlines approaching within 45 days)
   const closingSoonItems = useMemo(() => {
     const today = new Date();
@@ -213,6 +232,11 @@ export default function HomePage() {
       const userInt = interactions[item.id];
       if (onlyStarred && !userInt?.starred) return false;
       if (onlyAttending && !userInt?.participating) return false;
+      if (onlyMatchingSkills && userSkills.length > 0) {
+        const itemSkills = item.skills || extractSkills(item);
+        const match = calculateSkillMatch(itemSkills, userSkills);
+        if (match.matchCount === 0) return false;
+      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesTitle = item.title.toLowerCase().includes(q);
@@ -239,6 +263,8 @@ export default function HomePage() {
     searchQuery,
     onlyStarred,
     onlyAttending,
+    onlyMatchingSkills,
+    userSkills,
     interactionVersion,
   ]);
 
@@ -386,6 +412,11 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ── Feature #1: Deadline Collision Radar Banner ────────────────── */}
+        {collisionClusters.length > 0 && (
+          <CollisionRadarBanner clusters={collisionClusters} />
+        )}
+
         {/* ── LEAD SECTION: "Closing Soon" Urgent Deadlines ────────────────── */}
         {closingSoonItems.length > 0 && !onlyStarred && !onlyAttending && searchQuery === '' && (
           <section className="space-y-2.5">
@@ -478,6 +509,11 @@ export default function HomePage() {
           tierList={tierList}
           companyList={companyList}
           subfieldList={subfieldList}
+          onOpenCalendarSync={() => setIsCalendarSyncOpen(true)}
+          onOpenSkillPicker={() => setIsSkillPickerOpen(true)}
+          userSkillsCount={userSkills.length}
+          onlyMatchingSkills={onlyMatchingSkills}
+          onToggleMatchingSkills={() => setOnlyMatchingSkills(!onlyMatchingSkills)}
         />
 
         {/* Main Content Area */}
@@ -505,6 +541,7 @@ export default function HomePage() {
                   setSearchQuery('');
                   setOnlyStarred(false);
                   setOnlyAttending(false);
+                  setOnlyMatchingSkills(false);
                 }}
                 className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
               >
@@ -516,15 +553,37 @@ export default function HomePage() {
           <CalendarView opportunities={filtered} onRefresh={fetchOpportunities} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map(item => (
-              <OpportunityCard
-                key={item.id}
-                opportunity={item}
-              />
-            ))}
+            {filtered.map(item => {
+              const collision = getOpportunityCollision(item.id, collisionClusters);
+              return (
+                <OpportunityCard
+                  key={item.id}
+                  opportunity={item}
+                  userSkills={userSkills}
+                  isCollision={!!collision}
+                  collisionSeverity={collision?.severity}
+                />
+              );
+            })}
           </div>
         )}
       </main>
+
+      {/* Feature #2: iCalendar & WebCal Subscription Modal */}
+      <CalendarSubscriptionModal
+        isOpen={isCalendarSyncOpen}
+        onClose={() => setIsCalendarSyncOpen(false)}
+        savedOpportunityIds={opportunities
+          .filter(o => getAllInteractions()[o.id]?.starred)
+          .map(o => o.id)}
+      />
+
+      {/* Feature #7: Skill & Tech Stack Picker Modal */}
+      <SkillPickerModal
+        isOpen={isSkillPickerOpen}
+        onClose={() => setIsSkillPickerOpen(false)}
+        onSkillsUpdated={skills => setUserSkills(skills)}
+      />
 
       {/* Polished Footer */}
       <footer className="border-t border-slate-800/80 py-5 text-xs text-slate-500 bg-[#0c1015] mt-auto">
