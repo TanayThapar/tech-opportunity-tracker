@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getProfileByEmail, getProfileByHandle, savePendingOtp } from '@/lib/store';
+import { getProfileByEmail, getProfileByHandle, savePendingOtp, appendAuditLog } from '@/lib/store';
 import {
   isImmutableRootAdmin,
   hashPassword,
@@ -38,6 +38,14 @@ export async function POST(request: Request) {
 
     // Root administrator handles cannot be registered via public signup
     if (isImmutableRootAdmin(cleanHandle) || isImmutableRootAdmin(cleanEmail)) {
+      await appendAuditLog({
+        category: 'security',
+        action: 'AUTH_SIGNUP_REQUEST',
+        actor: { handle: cleanHandle, email: cleanEmail },
+        target: { type: 'auth', label: `@${cleanHandle}` },
+        status: 'failure',
+        description: `Blocked public sign-up registration attempt for protected root administrator account @${cleanHandle}`,
+      });
       return NextResponse.json(
         {
           success: false,
@@ -79,6 +87,15 @@ export async function POST(request: Request) {
     });
 
     const sendRes = await sendOtpEmail(cleanEmail, otp, name || cleanHandle);
+
+    await appendAuditLog({
+      category: 'auth',
+      action: 'AUTH_SIGNUP_REQUEST',
+      actor: { handle: cleanHandle, email: cleanEmail },
+      target: { type: 'auth', label: cleanEmail },
+      status: 'info',
+      description: `New registration initiated for @${cleanHandle} (${cleanEmail}). 6-digit confirmation code dispatched.`,
+    });
 
     return NextResponse.json({
       success: true,

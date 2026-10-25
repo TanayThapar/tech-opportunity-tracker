@@ -156,3 +156,50 @@ export interface RoleAuditLog {
   new_role: string;
   timestamp: string;
 }
+
+export type AuditLogCategory = 'auth' | 'admin' | 'security' | 'pipeline' | 'content';
+
+export type AuditActionType =
+  | 'AUTH_LOGIN_SUCCESS'
+  | 'AUTH_LOGIN_FAILED'
+  | 'AUTH_ROOT_LOGIN'
+  | 'AUTH_SIGNUP_REQUEST'
+  | 'AUTH_OTP_VERIFIED'
+  | 'AUTH_OTP_FAILED'
+  | 'AUTH_OTP_RESENT'
+  | 'AUTH_LOGOUT'
+  | 'ADMIN_ROLE_CHANGE'
+  | 'ADMIN_ACCOUNT_REVOKED'
+  | 'ADMIN_ACCOUNT_RESTORED'
+  | 'ADMIN_ACCOUNT_ERASED'
+  | 'ADMIN_SCHEDULE_UPDATE'
+  | 'OPPORTUNITY_SUBMITTED'
+  | 'OPPORTUNITY_APPROVED'
+  | 'OPPORTUNITY_REJECTED'
+  | 'OPPORTUNITY_UPDATED'
+  | 'PIPELINE_RUN_COMPLETED'
+  | 'PIPELINE_RUN_FAILED'
+  | 'AI_EXTRACTION_SUCCESS'
+  | 'AI_EXTRACTION_FAILED';
+
+export interface SystemAuditLog {
+  id: string;
+  timestamp: string;
+  category: AuditLogCategory;
+  action: AuditActionType;
+  actor: {
+    id?: string;
+    handle?: string;
+    email?: string;
+    role?: string;
+    ip?: string;
+  };
+  target?: {
+    type: 'user' | 'opportunity' | 'pipeline' | 'schedule' | 'auth';
+    id?: string;
+    label?: string;
+  };
+  status: 'success' | 'failure' | 'warning' | 'info';
+  description: string;
+  metadata?: Record<string, any>;
+}

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireRole, isImmutableRootAdmin } from '@/lib/serverAuth';
-import { updateUserRole, getProfileById, getAllProfiles, deleteUserProfile } from '@/lib/store';
+import { updateUserRole, getProfileById, getAllProfiles, deleteUserProfile, appendAuditLog } from '@/lib/store';
 import { UserRole } from '@/types/auth';
 
 export async function GET(request: Request) {
@@ -82,6 +82,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Failed to update role' }, { status: 500 });
     }
 
+    const action =
+      newRole === 'revoked'
+        ? 'ADMIN_ACCOUNT_REVOKED'
+        : targetProfile.role === 'revoked'
+        ? 'ADMIN_ACCOUNT_RESTORED'
+        : 'ADMIN_ROLE_CHANGE';
+
+    const desc =
+      newRole === 'revoked'
+        ? `Administrator @${user?.handle} revoked access for @${targetProfile.handle}`
+        : targetProfile.role === 'revoked'
+        ? `Administrator @${user?.handle} restored access for @${targetProfile.handle} with role "${newRole}"`
+        : `Administrator @${user?.handle} updated role for @${targetProfile.handle} from "${targetProfile.role}" to "${newRole}"`;
+
+    await appendAuditLog({
+      category: 'admin',
+      action,
+      actor: { id: user?.id, handle: user?.handle, email: user?.email, role: user?.role },
+      target: { type: 'user', id: targetProfile.id, label: `@${targetProfile.handle}` },
+      status: 'success',
+      description: desc,
+      metadata: { previousRole: targetProfile.role, newRole },
+    });
+
     return NextResponse.json({
       success: true,
       message: `User ${targetUserId} role updated to ${newRole}`,
@@ -140,6 +164,16 @@ export async function DELETE(request: Request) {
     if (!deleted) {
       return NextResponse.json({ success: false, error: 'Failed to erase user profile' }, { status: 500 });
     }
+
+    await appendAuditLog({
+      category: 'admin',
+      action: 'ADMIN_ACCOUNT_ERASED',
+      actor: { id: user?.id, handle: user?.handle, email: user?.email, role: user?.role },
+      target: { type: 'user', id: targetProfile.id, label: `@${targetProfile.handle}` },
+      status: 'warning',
+      description: `Administrator @${user?.handle} permanently erased account @${targetProfile.handle} (${targetProfile.name}) and all associated records`,
+      metadata: { erasedUserId: targetUserId, erasedEmail: targetProfile.email },
+    });
 
     return NextResponse.json({
       success: true,

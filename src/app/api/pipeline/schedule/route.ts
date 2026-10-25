@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getRefreshStatus, setRefreshIntervalHours } from '@/lib/refreshScheduler';
 import { getAuthenticatedUser } from '@/lib/serverAuth';
+import { appendAuditLog } from '@/lib/store';
 
 export async function GET() {
   const status = getRefreshStatus();
@@ -30,6 +31,16 @@ export async function POST(request: Request) {
 
     const updated = setRefreshIntervalHours(intervalHours);
     const status = getRefreshStatus();
+
+    await appendAuditLog({
+      category: 'admin',
+      action: 'ADMIN_SCHEDULE_UPDATE',
+      actor: { id: user.id, handle: user.handle, role: user.role },
+      target: { type: 'schedule', label: 'Scraper Refresh Interval' },
+      status: 'info',
+      description: `Administrator @${user.handle} updated crawler refresh interval to every ${updated} hours`,
+      metadata: { intervalHours: updated },
+    });
 
     return NextResponse.json({
       success: true,

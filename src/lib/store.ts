@@ -9,6 +9,9 @@ import {
   NotificationPreference,
   NotificationRecord,
   RoleAuditLog,
+  SystemAuditLog,
+  AuditLogCategory,
+  AuditActionType,
 } from '@/types';
 import { UserProfile, UserRole, EmailOtpRecord } from '@/types/auth';
 import { SEED_OPPORTUNITIES } from '@/data/seedOpportunities';
@@ -17,6 +20,7 @@ import { SEED_OPPORTUNITIES } from '@/data/seedOpportunities';
 const DATA_DIR = path.join(process.cwd(), '.data');
 const EVENTS_FILE = path.join(DATA_DIR, 'opportunities.json');
 const LOGS_FILE = path.join(DATA_DIR, 'pipeline_logs.json');
+const AUDIT_LOGS_FILE = path.join(DATA_DIR, 'audit_logs.json');
 
 function ensureDataDir() {
   try {
@@ -38,6 +42,7 @@ let memoryPreferences: Map<string, NotificationPreference> = new Map();
 let memoryUpdates: Map<string, UserUpdate[]> = new Map();
 let memoryNotifications: Set<string> = new Set();
 let memoryAuditLogs: RoleAuditLog[] = [];
+let memorySystemAuditLogs: SystemAuditLog[] = [];
 let memoryOtps: Map<string, EmailOtpRecord> = new Map();
 
 /**
@@ -287,6 +292,139 @@ export async function appendPipelineLog(log: PipelineRunLog): Promise<void> {
   } catch (err) {
     console.warn('Could not write pipeline logs to disk fallback:', err);
   }
+}
+
+// ── SYSTEM AUDIT & ACTIVITY LOGS ─────────────────────────────────────────────
+
+export async function getSystemAuditLogs(filters?: {
+  category?: string;
+  action?: string;
+  status?: string;
+  search?: string;
+  limit?: number;
+}): Promise<SystemAuditLog[]> {
+  const limit = filters?.limit || 200;
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      let query = supabase
+        .from('system_audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+
+      if (filters?.category && filters.category !== 'all') {
+        query = query.eq('category', filters.category);
+      }
+      if (filters?.status && filters.status !== 'all') {
+        query = query.eq('status', filters.status);
+      }
+      if (filters?.action && filters.action !== 'all') {
+        query = query.eq('action', filters.action);
+      }
+
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        return data as SystemAuditLog[];
+      }
+    } catch {
+      // Fall through to file/memory
+    }
+  }
+
+  if (memorySystemAuditLogs.length === 0) {
+    ensureDataDir();
+    if (fs.existsSync(AUDIT_LOGS_FILE)) {
+      try {
+        const raw = fs.readFileSync(AUDIT_LOGS_FILE, 'utf-8');
+        memorySystemAuditLogs = JSON.parse(raw);
+      } catch {
+        memorySystemAuditLogs = [];
+      }
+    }
+  }
+
+  let results = [...memorySystemAuditLogs];
+
+  if (filters?.category && filters.category !== 'all') {
+    results = results.filter(l => l.category === filters.category);
+  }
+  if (filters?.action && filters.action !== 'all') {
+    results = results.filter(l => l.action === filters.action);
+  }
+  if (filters?.status && filters.status !== 'all') {
+    results = results.filter(l => l.status === filters.status);
+  }
+  if (filters?.search) {
+    const q = filters.search.toLowerCase().trim();
+    results = results.filter(
+      l =>
+        l.description.toLowerCase().includes(q) ||
+        l.action.toLowerCase().includes(q) ||
+        (l.actor.handle && l.actor.handle.toLowerCase().includes(q)) ||
+        (l.actor.email && l.actor.email.toLowerCase().includes(q)) ||
+        (l.target?.label && l.target.label.toLowerCase().includes(q))
+    );
+  }
+
+  return results.slice(0, limit);
+}
+
+export async function appendAuditLog(entry: {
+  category: AuditLogCategory;
+  action: AuditActionType;
+  actor: {
+    id?: string;
+    handle?: string;
+    email?: string;
+    role?: string;
+    ip?: string;
+  };
+  target?: {
+    type: 'user' | 'opportunity' | 'pipeline' | 'schedule' | 'auth';
+    id?: string;
+    label?: string;
+  };
+  status: 'success' | 'failure' | 'warning' | 'info';
+  description: string;
+  metadata?: Record<string, any>;
+  id?: string;
+  timestamp?: string;
+}): Promise<SystemAuditLog> {
+  const completeLog: SystemAuditLog = {
+    id: entry.id || `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: entry.timestamp || new Date().toISOString(),
+    category: entry.category,
+    action: entry.action,
+    actor: entry.actor,
+    target: entry.target,
+    status: entry.status,
+    description: entry.description,
+    metadata: entry.metadata || {},
+  };
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('system_audit_logs').insert(completeLog);
+    } catch {
+      // Continue to local storage
+    }
+  }
+
+  memorySystemAuditLogs.unshift(completeLog);
+  if (memorySystemAuditLogs.length > 500) {
+    memorySystemAuditLogs.splice(500);
+  }
+
+  try {
+    ensureDataDir();
+    fs.writeFileSync(AUDIT_LOGS_FILE, JSON.stringify(memorySystemAuditLogs.slice(0, 300), null, 2), 'utf-8');
+  } catch {
+    // Read-only filesystem
+  }
+
+  return completeLog;
 }
 
 // ── PROFILES & ROLES (Problem 8) ──────────────────────────────────────────────
@@ -718,5 +856,6 @@ export function _resetMemoryStoreForTests(): void {
   memoryUpdates.clear();
   memoryNotifications.clear();
   memoryAuditLogs = [];
+  memorySystemAuditLogs = [];
   memoryOtps.clear();
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
-import { TechOpportunity, PipelineRunLog } from '@/types';
+import { TechOpportunity, PipelineRunLog, SystemAuditLog } from '@/types';
 import { getCurrentUser, fetchCurrentUser, getAuthHeaders } from '@/lib/auth';
 import { UserProfile, UserRole } from '@/types/auth';
 import {
@@ -47,6 +47,19 @@ export default function AdminAnalyticsDashboard() {
   const [customInputMode, setCustomInputMode] = useState(false);
   const [eraseTargetUser, setEraseTargetUser] = useState<UserProfile | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [recentAuditLogs, setRecentAuditLogs] = useState<SystemAuditLog[]>([]);
+
+  const fetchAuditLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/audit-logs?limit=8', { headers: getAuthHeaders() });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setRecentAuditLogs(json.data);
+      }
+    } catch (err) {
+      console.warn('Failed to load recent audit logs:', err);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -73,19 +86,24 @@ export default function AdminAnalyticsDashboard() {
 
         if (u?.role === 'admin') {
           const authHeaders = getAuthHeaders();
-          const [oppsRes, logsRes, usersRes] = await Promise.all([
+          const [oppsRes, logsRes, usersRes, auditRes] = await Promise.all([
             fetch('/api/opportunities?status=published', { headers: authHeaders }),
             fetch('/api/pipeline/logs', { headers: authHeaders }),
             fetch('/api/admin/roles', { headers: authHeaders }),
+            fetch('/api/admin/audit-logs?limit=8', { headers: authHeaders }),
           ]);
           const oppsJson = await oppsRes.json();
           const logsJson = await logsRes.json();
           const usersJson = await usersRes.json();
+          const auditJson = await auditRes.json();
 
           if (oppsJson.success) setOpportunities(oppsJson.data);
           if (logsJson.success) setLogs(logsJson.data);
           if (usersJson.success && Array.isArray(usersJson.data)) {
             setUsersList(usersJson.data);
+          }
+          if (auditJson.success && Array.isArray(auditJson.data)) {
+            setRecentAuditLogs(auditJson.data);
           }
         }
       } catch (err) {
@@ -134,7 +152,7 @@ export default function AdminAnalyticsDashboard() {
       const data = await res.json();
       if (data.success) {
         setRoleMessage(`Success: Role for user "${targetUserId}" updated to "${targetRole}"`);
-        await fetchUsers();
+        await Promise.all([fetchUsers(), fetchAuditLogs()]);
         setTimeout(() => setRoleMessage(null), 4000);
       } else {
         setRoleMessage(`Error: ${data.error || 'Failed to update user role'}`);
@@ -175,7 +193,7 @@ export default function AdminAnalyticsDashboard() {
       const data = await res.json();
       if (data.success) {
         setRoleMessage(`Success: User @${target.handle} access ${nextRole === 'revoked' ? 'revoked' : 'restored to user'}.`);
-        await fetchUsers();
+        await Promise.all([fetchUsers(), fetchAuditLogs()]);
         setTimeout(() => setRoleMessage(null), 4000);
       } else {
         setRoleMessage(`Error: ${data.error || 'Failed to update user access'}`);
@@ -199,7 +217,7 @@ export default function AdminAnalyticsDashboard() {
       if (data.success) {
         setRoleMessage(`Success: Account @${eraseTargetUser.handle} and all associated records permanently erased.`);
         setEraseTargetUser(null);
-        await fetchUsers();
+        await Promise.all([fetchUsers(), fetchAuditLogs()]);
         setTimeout(() => setRoleMessage(null), 4000);
       } else {
         setRoleMessage(`Error: ${data.error || 'Failed to erase account'}`);
@@ -624,6 +642,74 @@ export default function AdminAnalyticsDashboard() {
             <div className="text-2xl font-bold font-mono text-white mt-1">{starredTotal + attendingTotal}</div>
             <div className="text-[11px] text-slate-500 mt-1">{starredTotal} saved, {attendingTotal} attending</div>
           </div>
+        </div>
+
+        {/* Real-time System Audit & Action History Trail */}
+        <div className="p-5 rounded-xl bg-[#111620] border border-slate-800 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-lime-400" />
+              <div>
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Live Action History & Security Audit Trail
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Chronological event log of administrative interventions, authentication attempts, OTP verifications, and pipeline executions.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/pipeline-logs?tab=audit"
+              className="text-xs text-lime-400 hover:text-lime-300 font-medium transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <span>View Full Audit Log & Search ({recentAuditLogs.length})</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {recentAuditLogs.length === 0 ? (
+            <div className="p-6 text-center text-xs text-slate-500 font-mono">
+              No recent audit events recorded yet. Actions will automatically stream here.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-800/80 rounded-lg border border-slate-800 bg-[#0c1015] overflow-hidden">
+              {recentAuditLogs.map(log => {
+                return (
+                  <div
+                    key={log.id}
+                    className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-slate-900/40 transition-colors"
+                  >
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase shrink-0 ${
+                          log.action.includes('REVOKED') || log.action.includes('ERASED') || log.action.includes('FAILED')
+                            ? 'bg-rose-950 text-rose-300 border border-rose-500/40'
+                            : log.action.includes('ROOT')
+                            ? 'bg-purple-950 text-purple-300 border border-purple-500/40'
+                            : log.action.includes('ROLE')
+                            ? 'bg-amber-950 text-amber-300 border border-amber-500/40'
+                            : 'bg-lime-950 text-lime-300 border border-lime-500/40'
+                        }`}
+                      >
+                        {log.action.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-slate-200 truncate">{log.description}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 text-[11px] font-mono text-slate-400 self-end sm:self-auto">
+                      <span className="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-slate-300">
+                        {log.actor?.handle ? `@${log.actor.handle}` : log.actor?.email || 'System'}
+                      </span>
+                      <span className="text-slate-500">
+                        {log.timestamp ? log.timestamp.slice(11, 19) : ''}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Category breakdown */}

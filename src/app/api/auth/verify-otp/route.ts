@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPendingOtp, deletePendingOtp, saveProfile, savePendingOtp } from '@/lib/store';
+import { getPendingOtp, deletePendingOtp, saveProfile, savePendingOtp, appendAuditLog } from '@/lib/store';
 import { createSessionToken } from '@/lib/serverAuth';
 
 export async function POST(request: Request) {
@@ -33,6 +33,14 @@ export async function POST(request: Request) {
 
     if (pending.otp !== otp) {
       pending.attempts = (pending.attempts || 0) + 1;
+      await appendAuditLog({
+        category: 'auth',
+        action: 'AUTH_OTP_FAILED',
+        actor: { handle: pending.handle, email },
+        target: { type: 'auth', label: email },
+        status: 'failure',
+        description: `Failed OTP confirmation attempt for ${email}: Incorrect code (${pending.attempts}/5)`,
+      });
       if (pending.attempts >= 5) {
         await deletePendingOtp(email);
         return NextResponse.json(
@@ -69,6 +77,15 @@ export async function POST(request: Request) {
     });
 
     const { passwordHash: _, ...sanitizedProfile } = profile;
+
+    await appendAuditLog({
+      category: 'auth',
+      action: 'AUTH_OTP_VERIFIED',
+      actor: { id: profile.id, handle: profile.handle, email: profile.email, role: profile.role },
+      target: { type: 'user', id: profile.id, label: `@${profile.handle}` },
+      status: 'success',
+      description: `Email ${email} verified successfully. Account @${profile.handle} activated.`,
+    });
 
     const response = NextResponse.json({
       success: true,

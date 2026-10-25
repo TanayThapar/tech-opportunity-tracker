@@ -3,6 +3,7 @@ import {
   getOpportunities,
   addOpportunity,
   updateOpportunity,
+  appendAuditLog,
 } from '@/lib/store';
 import { TechOpportunity, OpportunityType } from '@/types';
 import { evaluateDuplicate } from '@/lib/fuzzy';
@@ -143,6 +144,17 @@ export async function POST(request: Request) {
     };
 
     const saved = await addOpportunity(newOpp);
+
+    await appendAuditLog({
+      category: 'content',
+      action: 'OPPORTUNITY_SUBMITTED',
+      actor: { handle: submitted_by || 'community_user' },
+      target: { type: 'opportunity', id: saved.id, label: saved.title },
+      status: 'info',
+      description: `New opportunity submitted for review: "${saved.title}" (${saved.type})`,
+      metadata: { organizer: saved.organizer, type: saved.type, url: saved.source_url },
+    });
+
     return NextResponse.json({ success: true, data: saved });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
@@ -204,6 +216,19 @@ export async function PATCH(request: Request) {
     if (!updated) {
       return NextResponse.json({ success: false, error: 'Opportunity not found' }, { status: 404 });
     }
+
+    const isApproval = status === 'published';
+    await appendAuditLog({
+      category: 'admin',
+      action: isApproval ? 'OPPORTUNITY_APPROVED' : 'OPPORTUNITY_UPDATED',
+      actor: { id: user?.id, handle: user?.handle, email: user?.email, role: user?.role },
+      target: { type: 'opportunity', id: updated.id, label: updated.title },
+      status: 'success',
+      description: isApproval
+        ? `Moderator @${user?.handle} approved opportunity "${updated.title}" into public radar`
+        : `Moderator @${user?.handle} updated opportunity "${updated.title}" (${Object.keys(updates).join(', ')})`,
+      metadata: { updates },
+    });
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error: any) {

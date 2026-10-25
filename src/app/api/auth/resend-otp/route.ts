@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPendingOtp, savePendingOtp } from '@/lib/store';
+import { getPendingOtp, savePendingOtp, appendAuditLog } from '@/lib/store';
 import { generateOtp, sendOtpEmail } from '@/lib/emailOtp';
 
 export async function POST(request: Request) {
@@ -29,6 +29,15 @@ export async function POST(request: Request) {
     await savePendingOtp(pending);
 
     const sendRes = await sendOtpEmail(email, newOtp, pending.name);
+
+    await appendAuditLog({
+      category: 'auth',
+      action: 'AUTH_OTP_RESENT',
+      actor: { handle: pending.handle, email },
+      target: { type: 'auth', label: email },
+      status: 'info',
+      description: `Fresh 6-digit confirmation code requested and resent to ${email}`,
+    });
 
     return NextResponse.json({
       success: true,

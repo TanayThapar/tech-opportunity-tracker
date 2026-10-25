@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { runDiscoveryPipeline } from '@/lib/pipeline';
 import { verifyCronSecret, getAuthenticatedUser } from '@/lib/serverAuth';
 import { recordPipelineRunTime, setPipelineRunningStatus } from '@/lib/refreshScheduler';
+import { appendAuditLog } from '@/lib/store';
 
 // Allow Vercel Cron or authenticated manual trigger
 export async function POST(request: Request) {
@@ -49,6 +50,16 @@ export async function POST(request: Request) {
 
     recordPipelineRunTime();
 
+    await appendAuditLog({
+      category: 'pipeline',
+      action: 'PIPELINE_RUN_COMPLETED',
+      actor: authenticatedUser ? { id: authenticatedUser.id, handle: authenticatedUser.handle, role: authenticatedUser.role } : { handle: 'System / Cron' },
+      target: { type: 'pipeline', label: 'Discovery Pipeline' },
+      status: 'success',
+      description: `Discovery pipeline completed: +${result.log.events_added} added, ${result.log.duplicates_skipped} duplicates skipped, ${result.log.events_archived} archived`,
+      metadata: { logId: result.log.id, eventsAdded: result.log.events_added, duplicatesSkipped: result.log.duplicates_skipped },
+    });
+
     return NextResponse.json({
       success: true,
       message: `Discovery pipeline finished successfully: +${result.log.events_added} added, ${result.log.duplicates_skipped} duplicates skipped, ${result.log.events_archived} archived.`,
@@ -77,6 +88,17 @@ export async function GET(request: Request) {
     // Cron execution never passes custom candidates
     const result = await runDiscoveryPipeline();
     recordPipelineRunTime();
+
+    await appendAuditLog({
+      category: 'pipeline',
+      action: 'PIPELINE_RUN_COMPLETED',
+      actor: { handle: 'Vercel Cron Scheduler' },
+      target: { type: 'pipeline', label: 'Automated Daily Ingestion' },
+      status: 'success',
+      description: `Automated Vercel Cron discovery run completed: +${result.log.events_added} added, ${result.log.duplicates_skipped} duplicates skipped`,
+      metadata: { logId: result.log.id },
+    });
+
     return NextResponse.json({
       success: true,
       message: `Vercel Cron run completed: +${result.log.events_added} added, ${result.log.duplicates_skipped} duplicates skipped, ${result.log.events_archived} archived.`,

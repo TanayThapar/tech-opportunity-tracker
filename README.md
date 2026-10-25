@@ -86,7 +86,20 @@ Dedicated track filtering dropdown on the dashboard:
   - **Immutable Root Admin Immunity**: Both root administrator accounts are permanently protected against revocation and deletion.
   - **Self-Destruction Protection**: Admins cannot revoke or erase their own active accounts.
 
-### 8. Personal Watchlist & Notifications
+### 8. Real-Time System Audit Trail & Activity Logs
+- **100% Action Visibility**: Every single action across the application is recorded in a tamper-resistant, chronological audit log:
+  - **Authentication Events**: Root admin logins, standard user logins, failed password attempts, blocked revoked attempts, unknown user sign-ins, and user logouts.
+  - **Email OTP Events**: Registration requests, OTP code dispatches, successful OTP verifications, invalid OTP attempts, and code resends.
+  - **Administrative Actions**: Role updates, account revocations/suspensions, account restorations, and permanent account erasures.
+  - **Content & Moderator Actions**: Community opportunity submissions, moderator approvals into published radar, status updates, and rejections.
+  - **Pipeline & AI Actions**: Manual crawler pipeline executions, scheduled Vercel Cron runs, scraper refresh interval modifications, and Gemini AI extractions.
+- **Dual-View Logs Hub** (`/pipeline-logs`):
+  - **System Activity & Audit Trail Tab**: Interactive search, category filters (Admin, Auth & OTP, Security, Pipeline, Submissions), status badges, actor attribution, and expandable metadata JSON inspector.
+  - **Crawler Pipeline Runs Tab**: Historical crawler logs with event counts, added/duplicate metrics, and detailed error traces.
+- **Live Admin Dashboard Stream** (`/admin`):
+  - Real-time audit widget displaying the most recent administrative and security events with live color-coded status badges and instant drill-down.
+
+### 9. Personal Watchlist & Notifications
 - **Watchlist (Bookmark)**: Save opportunities to a personal watchlist.
 - **Attending / RSVP Status**: Mark events as attending to track personal schedules.
 - **Community Comments**: Add comments and discussion to opportunities.
@@ -102,7 +115,7 @@ Dedicated track filtering dropdown on the dashboard:
 - **Date Handling**: `date-fns`
 - **Validation**: Zod
 - **Deduplication**: Fast-Levenshtein with normalized title, date, and organizer containment
-- **Testing**: Vitest (94 tests across 17 suites)
+- **Testing**: Vitest (101 tests across 18 suites)
 - **Zero Paid Dependencies**: 100% open-source libraries, free community feeds, and self-hostable tools.
 
 ---

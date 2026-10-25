@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractOpportunityWithGemini } from '@/lib/ai/provider';
 import { safeFetch } from '@/lib/safeFetch';
+import { appendAuditLog } from '@/lib/store';
 
 export async function POST(req: NextRequest) {
   try {
@@ -71,11 +72,29 @@ export async function POST(req: NextRequest) {
     );
 
     if (extraction.error || !extraction.item) {
+      await appendAuditLog({
+        category: 'pipeline',
+        action: 'AI_EXTRACTION_FAILED',
+        actor: { handle: 'AI Gemini Parser' },
+        target: { type: 'opportunity', label: url || 'Pasted text' },
+        status: 'failure',
+        description: `AI opportunity extraction failed: ${extraction.error || 'Parsing error'}`,
+      });
       return NextResponse.json(
         { success: false, error: extraction.error || 'Failed to extract opportunity details.' },
         { status: 422 }
       );
     }
+
+    await appendAuditLog({
+      category: 'pipeline',
+      action: 'AI_EXTRACTION_SUCCESS',
+      actor: { handle: 'AI Gemini Parser' },
+      target: { type: 'opportunity', label: extraction.item.title || url },
+      status: 'success',
+      description: `Gemini extracted opportunity "${extraction.item.title}" (${extraction.item.type || 'conference'})`,
+      metadata: { url, model: model || 'gemini-1.5-flash' },
+    });
 
     return NextResponse.json({
       success: true,

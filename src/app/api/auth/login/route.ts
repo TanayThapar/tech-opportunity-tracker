@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getProfileByEmail, getProfileByHandle, saveProfile } from '@/lib/store';
+import { getProfileByEmail, getProfileByHandle, saveProfile, appendAuditLog } from '@/lib/store';
 import {
   isBootstrapAdmin,
   isImmutableRootAdmin,
@@ -35,6 +35,14 @@ export async function POST(request: Request) {
     // Enforce root administrator password protection
     if (isRootAdmin) {
       if (!password || !verifyRootAdminPassword(password)) {
+        await appendAuditLog({
+          category: 'security',
+          action: 'AUTH_LOGIN_FAILED',
+          actor: { handle, email, role: 'unknown' },
+          target: { type: 'auth', label: `@${handle}` },
+          status: 'failure',
+          description: `Failed root administrator login attempt for @${handle}: Invalid root password`,
+        });
         return NextResponse.json(
           {
             success: false,
@@ -53,6 +61,14 @@ export async function POST(request: Request) {
 
     if (profile) {
       if (profile.role === 'revoked') {
+        await appendAuditLog({
+          category: 'security',
+          action: 'AUTH_LOGIN_FAILED',
+          actor: { id: profile.id, handle: profile.handle, email: profile.email, role: 'revoked' },
+          target: { type: 'user', id: profile.id, label: `@${profile.handle}` },
+          status: 'warning',
+          description: `Blocked login attempt for revoked account @${profile.handle}`,
+        });
         return NextResponse.json(
           {
             success: false,
@@ -67,6 +83,14 @@ export async function POST(request: Request) {
         if (profile.passwordHash && password) {
           const matches = verifyPassword(password, profile.passwordHash);
           if (!matches) {
+            await appendAuditLog({
+              category: 'auth',
+              action: 'AUTH_LOGIN_FAILED',
+              actor: { id: profile.id, handle: profile.handle, email: profile.email, role: profile.role },
+              target: { type: 'user', id: profile.id, label: `@${profile.handle}` },
+              status: 'failure',
+              description: `Failed login attempt for @${profile.handle}: Incorrect password`,
+            });
             return NextResponse.json(
               { success: false, error: 'Invalid password. Please check your credentials.' },
               { status: 401 }
@@ -105,6 +129,14 @@ export async function POST(request: Request) {
           passwordHash: hashPassword(ROOT_ADMIN_PASSWORD),
         });
       } else {
+        await appendAuditLog({
+          category: 'auth',
+          action: 'AUTH_LOGIN_FAILED',
+          actor: { handle, email, role: 'unknown' },
+          target: { type: 'auth', label: `@${handle}` },
+          status: 'failure',
+          description: `Failed login attempt: Account "@${handle}" does not exist`,
+        });
         // Non-root accounts MUST be created via registration/sign-up!
         return NextResponse.json(
           {
@@ -125,6 +157,17 @@ export async function POST(request: Request) {
     });
 
     const { passwordHash: _, ...sanitizedProfile } = profile;
+
+    await appendAuditLog({
+      category: isRootAdmin ? 'security' : 'auth',
+      action: isRootAdmin ? 'AUTH_ROOT_LOGIN' : 'AUTH_LOGIN_SUCCESS',
+      actor: { id: profile.id, handle: profile.handle, email: profile.email, role: profile.role },
+      target: { type: 'user', id: profile.id, label: `@${profile.handle}` },
+      status: 'success',
+      description: isRootAdmin
+        ? `Root administrator @${profile.handle} successfully authenticated with root credentials`
+        : `User @${profile.handle} (${profile.name}) successfully logged in`,
+    });
 
     const response = NextResponse.json({
       success: true,
