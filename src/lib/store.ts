@@ -10,7 +10,7 @@ import {
   NotificationRecord,
   RoleAuditLog,
 } from '@/types';
-import { UserProfile, UserRole } from '@/types/auth';
+import { UserProfile, UserRole, EmailOtpRecord } from '@/types/auth';
 import { SEED_OPPORTUNITIES } from '@/data/seedOpportunities';
 
 // In-memory / file fallback for local offline testing and development
@@ -38,6 +38,7 @@ let memoryPreferences: Map<string, NotificationPreference> = new Map();
 let memoryUpdates: Map<string, UserUpdate[]> = new Map();
 let memoryNotifications: Set<string> = new Set();
 let memoryAuditLogs: RoleAuditLog[] = [];
+let memoryOtps: Map<string, EmailOtpRecord> = new Map();
 
 /**
  * Returns a server Supabase client if environment credentials exist.
@@ -386,6 +387,28 @@ export async function saveProfile(profile: UserProfile): Promise<UserProfile> {
   return profile;
 }
 
+// ── EMAIL OTP & CONFIRMATION ──────────────────────────────────────────────────
+
+export async function savePendingOtp(record: EmailOtpRecord): Promise<void> {
+  const clean = record.email.toLowerCase().trim();
+  memoryOtps.set(clean, record);
+}
+
+export async function getPendingOtp(email: string): Promise<EmailOtpRecord | null> {
+  const clean = email.toLowerCase().trim();
+  const record = memoryOtps.get(clean);
+  if (!record) return null;
+  if (Date.now() > record.expiresAt) {
+    memoryOtps.delete(clean);
+    return null;
+  }
+  return record;
+}
+
+export async function deletePendingOtp(email: string): Promise<void> {
+  memoryOtps.delete(email.toLowerCase().trim());
+}
+
 export async function updateUserRole(
   targetUserId: string,
   newRole: UserRole,
@@ -669,4 +692,5 @@ export function _resetMemoryStoreForTests(): void {
   memoryUpdates.clear();
   memoryNotifications.clear();
   memoryAuditLogs = [];
+  memoryOtps.clear();
 }

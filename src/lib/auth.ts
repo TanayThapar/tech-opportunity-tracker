@@ -84,8 +84,19 @@ export async function loginWithServer(
   }
 }
 
+export interface SignupResponse {
+  success: boolean;
+  requireOtp?: boolean;
+  email?: string;
+  devOtp?: string;
+  message?: string;
+  user?: UserProfile;
+  token?: string;
+  error?: string;
+}
+
 /**
- * Registers a new account via /api/auth/signup.
+ * Registers a new account via /api/auth/signup. Dispatches an email OTP confirmation.
  */
 export async function signupWithServer(
   name: string,
@@ -93,7 +104,7 @@ export async function signupWithServer(
   password?: string,
   email?: string,
   handle?: string
-): Promise<{ success: boolean; user?: UserProfile; token?: string; error?: string }> {
+): Promise<SignupResponse> {
   const cleanName = name.trim();
   const clean = identifier.trim();
   if (!clean && !email && !handle) return { success: false, error: 'Username or Email cannot be empty' };
@@ -112,6 +123,38 @@ export async function signupWithServer(
     });
 
     const data = await res.json();
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        requireOtp: !!data.requireOtp,
+        email: data.email,
+        devOtp: data.devOtp,
+        message: data.message,
+        user: data.user,
+        token: data.token,
+      };
+    }
+    return { success: false, error: data.error || 'Registration failed' };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error during registration' };
+  }
+}
+
+/**
+ * Confirms email address using the 6-digit OTP code.
+ */
+export async function verifyOtpWithServer(
+  email: string,
+  otp: string
+): Promise<{ success: boolean; user?: UserProfile; token?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim() }),
+    });
+
+    const data = await res.json();
     if (res.ok && data.success && data.user) {
       if (typeof window !== 'undefined') {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data.user));
@@ -122,9 +165,32 @@ export async function signupWithServer(
       }
       return { success: true, user: data.user, token: data.token };
     }
-    return { success: false, error: data.error || 'Registration failed' };
+    return { success: false, error: data.error || 'Verification failed' };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Network error during registration' };
+    return { success: false, error: err.message || 'Network error during verification' };
+  }
+}
+
+/**
+ * Requests a fresh 6-digit OTP code to the specified email.
+ */
+export async function resendOtpWithServer(
+  email: string
+): Promise<{ success: boolean; devOtp?: string; message?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/resend-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return { success: true, devOtp: data.devOtp, message: data.message };
+    }
+    return { success: false, error: data.error || 'Failed to resend code' };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error during resend' };
   }
 }
 

@@ -8,6 +8,17 @@ export interface UserProfile {
   role: UserRole;
   createdAt: string;
   passwordHash?: string;
+  emailVerified?: boolean;
+}
+
+export interface EmailOtpRecord {
+  email: string;
+  handle: string;
+  name: string;
+  passwordHash: string;
+  otp: string;
+  expiresAt: number;
+  attempts: number;
 }
 
 export interface AuthState {

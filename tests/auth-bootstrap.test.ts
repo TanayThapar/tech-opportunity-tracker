@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { POST as loginPOST } from '@/app/api/auth/login/route';
 import { GET as meGET } from '@/app/api/auth/me/route';
-import { _resetMemoryStoreForTests } from '@/lib/store';
-import { isBootstrapAdmin } from '@/lib/serverAuth';
+import { _resetMemoryStoreForTests, saveProfile } from '@/lib/store';
+import { isBootstrapAdmin, hashPassword } from '@/lib/serverAuth';
 
 describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
   beforeEach(() => {
@@ -74,10 +74,20 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
   });
 
   it('assigns role "user" to a non-admin account upon login', async () => {
+    await saveProfile({
+      id: 'usr-student-2026',
+      email: 'regular_student_2026@radar.internal',
+      name: 'Regular Student',
+      handle: 'regular_student_2026',
+      role: 'user',
+      createdAt: new Date().toISOString(),
+      passwordHash: hashPassword('testpass123'),
+    });
+
     const req = new Request('http://localhost:3000/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: 'regular_student_2026' }),
+      body: JSON.stringify({ identifier: 'regular_student_2026', password: 'testpass123' }),
     });
 
     const res = await loginPOST(req);
@@ -86,6 +96,20 @@ describe('Bootstrap Admin Authentication & Single-Scheme RBAC', () => {
     expect(data.success).toBe(true);
     expect(data.user.role).toBe('user');
     expect(data.token).toBeDefined();
+  });
+
+  it('strictly rejects login for unregistered random accounts without prior registration', async () => {
+    const req = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'random_unknown_user_999', password: 'any_password' }),
+    });
+
+    const res = await loginPOST(req);
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(data.success).toBe(false);
+    expect(data.error).toContain('Account not found');
   });
 
   it('verifies admin session via GET /api/auth/me with bearer token', async () => {

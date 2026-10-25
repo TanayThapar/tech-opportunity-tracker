@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getProfileByEmail, getProfileByHandle, saveProfile } from '@/lib/store';
+import { getProfileByEmail, getProfileByHandle, savePendingOtp } from '@/lib/store';
 import {
-  isBootstrapAdmin,
   isImmutableRootAdmin,
   hashPassword,
-  createSessionToken,
 } from '@/lib/serverAuth';
+import { generateOtp, sendOtpEmail } from '@/lib/emailOtp';
 
 export async function POST(request: Request) {
   try {
@@ -26,6 +25,13 @@ export async function POST(request: Request) {
     if (!cleanHandle || !cleanEmail) {
       return NextResponse.json(
         { success: false, error: 'Username or email is required.' },
+        { status: 400 }
+      );
+    }
+
+    if (password && password.length < 6) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 6 characters long.' },
         { status: 400 }
       );
     }
@@ -58,43 +64,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const isBootstrap = isBootstrapAdmin(cleanEmail) || isBootstrapAdmin(cleanHandle);
-    const role = isBootstrap ? 'admin' : 'user';
+    // Generate 6-digit confirmation OTP
+    const otp = generateOtp();
+    const passwordHash = password ? hashPassword(password) : hashPassword('Manipal_Default');
 
-    const profile = await saveProfile({
-      id: `usr-${cleanHandle}-${Date.now().toString(36)}`,
+    await savePendingOtp({
       email: cleanEmail,
-      name: name || cleanHandle,
       handle: cleanHandle,
-      role,
-      createdAt: new Date().toISOString(),
-      passwordHash: password ? hashPassword(password) : undefined,
+      name: name || cleanHandle,
+      passwordHash,
+      otp,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      attempts: 0,
     });
 
-    const token = createSessionToken({
-      userId: profile.id,
-      email: profile.email,
-      handle: profile.handle,
-      role: profile.role,
-    });
+    const sendRes = await sendOtpEmail(cleanEmail, otp, name || cleanHandle);
 
-    const { passwordHash: _, ...sanitizedProfile } = profile;
-
-    const response = NextResponse.json({
+    return NextResponse.json({
       success: true,
-      user: sanitizedProfile,
-      token,
+      requireOtp: true,
+      email: cleanEmail,
+      message: 'A 6-digit verification code has been sent to your email address.',
+      devOtp: sendRes.devOtp,
     });
-
-    response.cookies.set('radar_session', token, {
-      path: '/',
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 7,
-      sameSite: 'lax',
-    });
-
-    return response;
   } catch (error: any) {
     console.error('Signup error:', error);
     return NextResponse.json(
@@ -103,3 +95,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

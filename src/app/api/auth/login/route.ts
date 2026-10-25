@@ -83,17 +83,27 @@ export async function POST(request: Request) {
       }
       profile = await saveProfile(profile);
     } else {
-      // Auto-provision bootstrap admin or new tester/user
-      const initialRole = isBootstrap ? 'admin' : 'user';
-      profile = await saveProfile({
-        id: `usr-${handle.toLowerCase()}`,
-        email,
-        name: name || (handle.toLowerCase() === 'tanaythapar' ? 'Tanay Thapar' : handle.toLowerCase() === 'sanvi850' ? 'Sanvi Sharma' : handle),
-        handle,
-        role: initialRole,
-        createdAt: new Date().toISOString(),
-        passwordHash: isRootAdmin ? hashPassword(ROOT_ADMIN_PASSWORD) : password ? hashPassword(password) : undefined,
-      });
+      // If root admin, provision first-time root account with verified credentials
+      if (isRootAdmin) {
+        profile = await saveProfile({
+          id: `usr-${handle.toLowerCase()}`,
+          email,
+          name: name || (handle.toLowerCase() === 'tanaythapar' ? 'Tanay Thapar' : handle.toLowerCase() === 'sanvi850' ? 'Sanvi Sharma' : handle),
+          handle,
+          role: 'admin',
+          createdAt: new Date().toISOString(),
+          passwordHash: hashPassword(ROOT_ADMIN_PASSWORD),
+        });
+      } else {
+        // Non-root accounts MUST be created via registration/sign-up!
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Account not found. Please create an account before signing in.',
+          },
+          { status: 404 }
+        );
+      }
     }
 
     // Generate verified cryptographic HMAC session token
