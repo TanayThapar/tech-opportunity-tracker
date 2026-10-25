@@ -10,6 +10,7 @@ import {
   formatIcsDate,
   foldIcsLine,
   escapeIcsText,
+  createGoogleCalendarEventUrl,
 } from '@/lib/ical';
 import {
   extractSkills,
@@ -192,6 +193,15 @@ describe('Feature #2: Live RFC 5545 iCalendar Feed Engine', () => {
     expect(ics).toContain('END:VEVENT');
     expect(ics).toContain('END:VCALENDAR');
     expect(ics.endsWith('\r\n')).toBe(true);
+  });
+
+  it('generates a 1-click Google Calendar Event Template URL for direct import', () => {
+    const googleCalUrl = createGoogleCalendarEventUrl(opps[0], 'deadline');
+    expect(googleCalUrl).toContain('https://calendar.google.com/calendar/render?action=TEMPLATE');
+    expect(googleCalUrl).toContain('text=%E2%8F%B3+%5BPaper+%2F+CFP+Submission+Deadline%5D+NeurIPS+2026');
+    expect(googleCalUrl).toContain('dates=20260521');
+    expect(googleCalUrl).toContain('Vancouver');
+    expect(googleCalUrl).toContain('https%3A%2F%2Fnips.cc%2FConferences%2F2026');
   });
 });
 

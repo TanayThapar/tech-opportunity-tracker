@@ -9,7 +9,7 @@
 
 import { TechOpportunity } from '@/types';
 
-export type SocietyFilter = 'all' | 'acm' | 'ieee' | 'usenix' | 'other';
+export type SocietyFilter = 'all' | 'acm' | 'ieee' | 'usenix' | 'other' | 'acm_ieee';
 
 export type RecognizedSociety = 'ACM' | 'IEEE' | 'USENIX';
 
@@ -90,6 +90,10 @@ export function matchesSociety(
 
   if (filter === 'ieee') {
     return societies.includes('IEEE');
+  }
+
+  if (filter === 'acm_ieee') {
+    return societies.includes('ACM') || societies.includes('IEEE');
   }
 
   if (filter === 'usenix') {

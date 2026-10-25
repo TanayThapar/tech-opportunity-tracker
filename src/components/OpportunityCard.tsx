@@ -9,6 +9,7 @@ import { getInteraction, toggleStar, toggleParticipating, addComment } from '@/l
 import {
   ExternalLink,
   Calendar,
+  CalendarPlus,
   Building2,
   MapPin,
   AlertTriangle,
@@ -24,6 +25,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { createGoogleCalendarEventUrl } from '@/lib/ical';
 
 interface OpportunityCardProps {
   opportunity: TechOpportunity;
@@ -308,15 +310,28 @@ export default function OpportunityCard({
 
       {/* Card Footer Actions */}
       <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-        <a
-          href={opportunity.source_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-lime-400 hover:text-lime-300 font-semibold transition-colors focus:outline-none focus:underline"
-        >
-          <span>{opportunity.type === 'job' ? 'View Requisition' : 'Official Portal'}</span>
-          <ExternalLink className="w-3 h-3" />
-        </a>
+        <div className="flex items-center gap-3">
+          <a
+            href={opportunity.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-lime-400 hover:text-lime-300 font-semibold transition-colors focus:outline-none focus:underline"
+          >
+            <span>{opportunity.type === 'job' ? 'View Requisition' : 'Official Portal'}</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+
+          <a
+            href={createGoogleCalendarEventUrl(opportunity, 'deadline')}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Add this opportunity / deadline directly to your Google Calendar"
+            className="inline-flex items-center gap-1 text-slate-400 hover:text-blue-400 transition-colors font-medium text-[11px] py-1 px-1.5 rounded hover:bg-slate-800"
+          >
+            <CalendarPlus className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">Google Cal</span>
+          </a>
+        </div>
 
         <div className="flex items-center gap-2">
           {/* Comments drawer toggle */}

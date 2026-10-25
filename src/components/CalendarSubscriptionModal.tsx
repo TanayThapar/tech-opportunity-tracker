@@ -27,17 +27,21 @@ export default function CalendarSubscriptionModal({
   if (filterPreset === 'saved' && savedOpportunityIds.length > 0) {
     queryParams = `?ids=${savedOpportunityIds.join(',')}&name=My%20Saved%20Deadlines`;
   } else if (filterPreset === 'acm_ieee') {
-    queryParams = '?society=acm&name=ACM%20and%20IEEE%20Deadlines';
+    queryParams = '?society=acm_ieee&name=ACM%20and%20IEEE%20Deadlines';
   } else if (filterPreset === 'conferences') {
     queryParams = '?type=conference,workshop&name=Conferences%20and%20Workshops';
   }
 
-  const httpsFeedUrl = `${baseUrl}/api/calendar/feed${queryParams}`;
+  // Use /api/calendar/feed.ics so Google Calendar and client importers see the .ics extension
+  const httpsFeedUrl = `${baseUrl}/api/calendar/feed.ics${queryParams}`;
   const webcalUrl = httpsFeedUrl.replace(/^https?:\/\//, 'webcal://');
-  const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
+
+  // Google Calendar import link (Google Calendar requires valid HTTPS/HTTP URL, not webcal://)
+  const googleCalendarDirectUrl = `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(httpsFeedUrl)}`;
+  const googleCalendarManualSettingsUrl = 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl';
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(webcalUrl);
+    navigator.clipboard.writeText(httpsFeedUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -141,14 +145,15 @@ export default function CalendarSubscriptionModal({
 
             {/* Subscription Link & Action Buttons */}
             <div className="space-y-2 pt-1">
-              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                WebCal Subscription URL:
-              </label>
+              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                <span>Calendar Feed URL (.ics):</span>
+                <span className="text-[10px] text-lime-400 lowercase font-mono">https & webcal supported</span>
+              </div>
               <div className="flex gap-2">
                 <input
                   type="text"
                   readOnly
-                  value={webcalUrl}
+                  value={httpsFeedUrl}
                   className="flex-1 px-3 py-2 text-xs font-mono rounded-lg border border-slate-700 bg-[#0c1015] text-slate-300 focus:outline-none select-all"
                 />
                 <button
@@ -157,15 +162,15 @@ export default function CalendarSubscriptionModal({
                   className="px-3.5 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-lime-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Copied!' : 'Copy'}</span>
+                  <span>{copied ? 'Copied URL!' : 'Copy Feed'}</span>
                 </button>
               </div>
             </div>
 
             {/* Quick 1-Click Subscribe Buttons */}
-            <div className="grid grid-cols-2 gap-2.5 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
               <a
-                href={googleCalendarUrl}
+                href={googleCalendarDirectUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all text-center shadow-sm cursor-pointer"
@@ -175,18 +180,45 @@ export default function CalendarSubscriptionModal({
               </a>
 
               <a
-                href={httpsFeedUrl}
-                download="tech-opportunities.ics"
+                href={webcalUrl}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all text-center cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5 text-lime-400" />
-                <span>Download .ICS File</span>
+                <Calendar className="w-3.5 h-3.5 text-lime-400" />
+                <span>Subscribe in Apple / Default</span>
               </a>
             </div>
 
-            <p className="text-[11px] text-slate-500 text-center pt-1">
-              Built with standard RFC 5545 iCalendar format. Compatible with iOS, macOS, Windows, Android, and Linux.
-            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1 text-[11px] text-slate-400">
+              <a
+                href={httpsFeedUrl}
+                download="tech-opportunities.ics"
+                className="hover:text-lime-400 transition-colors flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" />
+                <span>Download offline .ICS file</span>
+              </a>
+
+              <a
+                href={googleCalendarManualSettingsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-blue-400 transition-colors flex items-center gap-1"
+              >
+                <span>Google Calendar Settings ("From URL") ➔</span>
+              </a>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-[#0c1015] border border-slate-800 text-[11px] text-slate-400 leading-relaxed space-y-1">
+              <p>
+                <strong>Google Calendar Tips:</strong>
+              </p>
+              <p>
+                • Click <strong>"Add to Google Calendar"</strong> for automatic 1-click subscription.
+              </p>
+              <p>
+                • Or click <strong>"Copy Feed"</strong> ➔ open Google Calendar ➔ next to <em>Other calendars</em> click <strong>+</strong> ➔ choose <strong>From URL</strong> ➔ paste link.
+              </p>
+            </div>
           </div>
         </motion.div>
       </motion.div>

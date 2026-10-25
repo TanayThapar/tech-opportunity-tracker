@@ -179,3 +179,71 @@ export const formatIcsDate = formatICalDate;
 export const foldIcsLine = foldICalLine;
 export const generateIcsFeed = generateICalFeed;
 
+/**
+ * Generates a 1-click Google Calendar Event Template URL for an individual opportunity or deadline.
+ * Pre-populates title, dates, details, and link:
+ * https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=...&details=...&location=...
+ */
+export function createGoogleCalendarEventUrl(
+  opportunity: TechOpportunity,
+  targetType: 'deadline' | 'event' = 'deadline'
+): string {
+  const deadlineStr = opportunity.submission_deadline || opportunity.application_deadline;
+  const isJob = opportunity.type === 'job' || opportunity.type === 'internship';
+  const hasDeadline = !!deadlineStr && targetType === 'deadline';
+
+  let title = '';
+  let startStr = '';
+  let endStr = '';
+
+  if (hasDeadline && deadlineStr) {
+    const deadlineLabel = isJob ? 'Application Deadline' : 'Paper / CFP Submission Deadline';
+    title = `⏳ [${deadlineLabel}] ${opportunity.title}`;
+    const cleanDate = deadlineStr.replace(/[^0-9]/g, '').slice(0, 8);
+    try {
+      const d = new Date(deadlineStr);
+      const nextDay = new Date(d.getTime() + 24 * 60 * 60 * 1000);
+      const nextDateStr = nextDay.toISOString().replace(/[^0-9]/g, '').slice(0, 8);
+      startStr = cleanDate;
+      endStr = nextDateStr;
+    } catch {
+      startStr = cleanDate;
+      endStr = cleanDate;
+    }
+  } else {
+    title = `🗓️ [${opportunity.type.toUpperCase()}] ${opportunity.title}`;
+    const sClean = (opportunity.start_date || new Date().toISOString()).replace(/[^0-9]/g, '').slice(0, 8);
+    let eClean = (opportunity.end_date || opportunity.start_date || new Date().toISOString()).replace(/[^0-9]/g, '').slice(0, 8);
+    try {
+      const endD = new Date(opportunity.end_date || opportunity.start_date);
+      const nextDay = new Date(endD.getTime() + 24 * 60 * 60 * 1000);
+      eClean = nextDay.toISOString().replace(/[^0-9]/g, '').slice(0, 8);
+    } catch {
+      // Keep eClean
+    }
+    startStr = sClean;
+    endStr = eClean;
+  }
+
+  const detailsParts: string[] = [];
+  if (opportunity.organizer) detailsParts.push(`Organizer: ${opportunity.organizer}`);
+  if (opportunity.conference_tier) detailsParts.push(`Tier: ${opportunity.conference_tier}`);
+  if (opportunity.subfield) detailsParts.push(`Track: ${opportunity.subfield}`);
+  if (hasDeadline && deadlineStr) detailsParts.push(`Submission Due: ${deadlineStr}`);
+  if (opportunity.description) detailsParts.push(`\nDescription:\n${opportunity.description}`);
+  if (opportunity.source_url) detailsParts.push(`\nOfficial Link:\n${opportunity.source_url}`);
+
+  const details = detailsParts.join('\n');
+  const location = opportunity.location || (opportunity.format ? `${opportunity.format} (Online/Virtual)` : '');
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${startStr}/${endStr}`,
+    details,
+    location,
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+

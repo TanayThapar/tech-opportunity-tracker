@@ -29,6 +29,7 @@ import {
   Clock,
   MapPin,
   CalendarDays,
+  CalendarPlus,
   X,
   Bookmark,
   AlertTriangle,
@@ -39,6 +40,7 @@ import { TypeBadge, TierBadge, SocietyBadge, CATEGORY_COLORS } from './Badge';
 import { detectSocieties } from '@/lib/societyUtils';
 import { getInteraction, toggleStar, toggleParticipating, toggleReminder } from '@/lib/interactions';
 import { getCurrentUser } from '@/lib/auth';
+import { createGoogleCalendarEventUrl } from '@/lib/ical';
 import { motion, AnimatePresence } from 'motion/react';
 import ContributorModal from './ContributorModal';
 
@@ -858,6 +860,18 @@ function EventDetailPanel({
             <Users className="w-3.5 h-3.5" />
             Contributors {event.contributors && event.contributors.length > 0 ? `(${event.contributors.length})` : ''}
           </button>
+
+          <a
+            href={createGoogleCalendarEventUrl(event, 'deadline')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all cursor-pointer"
+            title="Add this opportunity / deadline to Google Calendar in 1 click"
+          >
+            <CalendarPlus className="w-3.5 h-3.5 text-blue-500" />
+            <span>Add to Google Calendar</span>
+            <ExternalLink className="w-3 h-3 text-blue-400 ml-0.5" />
+          </a>
         </div>
 
         {/* Contributors list */}
