@@ -35,7 +35,8 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react';
-import { TypeBadge, TierBadge, CATEGORY_COLORS } from './Badge';
+import { TypeBadge, TierBadge, SocietyBadge, CATEGORY_COLORS } from './Badge';
+import { detectSocieties } from '@/lib/societyUtils';
 import { getInteraction, toggleStar, toggleParticipating, toggleReminder } from '@/lib/interactions';
 import { getCurrentUser } from '@/lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -717,6 +718,9 @@ function EventDetailPanel({
           <div className="flex items-center gap-1.5 mb-1">
             <TypeBadge type={event.type} />
             {event.type === 'conference' && <TierBadge tier={event.conference_tier} />}
+            {detectSocieties(event).map(soc => (
+              <SocietyBadge key={soc} society={soc} />
+            ))}
           </div>
           <h2 className="text-base font-bold text-white leading-tight">{event.title}</h2>
           <p className="text-xs text-white/80 mt-0.5">{event.organizer}</p>

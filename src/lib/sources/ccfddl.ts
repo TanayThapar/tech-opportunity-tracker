@@ -219,12 +219,38 @@ export async function fetchCCFDeadlines(): Promise<RawDiscoveredItem[]> {
         ? `${conf.title} ${edition.year}: ${conf.description}`
         : `${conf.title} ${edition.year}`;
 
+      // Detect organizer, professional society sponsorship, and workshop classification
+      let organizer = conf.sub ? `CCF-${conf.sub} / ${conf.title} Steering Committee` : `${conf.title} Committee`;
+      const combinedInfo = `${conf.title} ${conf.description || ''}`;
+
+      if (/\bACM\s+SIG[A-Z]+/i.test(combinedInfo)) {
+        const match = combinedInfo.match(/\b(ACM\s+SIG[A-Z]+)/i);
+        organizer = match ? match[1].toUpperCase() : 'ACM';
+      } else if (/\bACM\b/i.test(combinedInfo) && /\bIEEE\b/i.test(combinedInfo)) {
+        organizer = 'ACM / IEEE';
+      } else if (/\bACM\b/i.test(combinedInfo)) {
+        organizer = 'ACM';
+      } else if (/\bIEEE\s+(?:Computer Society|Robotics and Automation Society|Signal Processing Society|Communications Society|Control Systems Society|TCCA)\b/i.test(combinedInfo)) {
+        const match = combinedInfo.match(/\b(IEEE\s+[A-Za-z\s]+Society)\b/i);
+        organizer = match ? match[1] : 'IEEE Computer Society';
+      } else if (/\bIEEE\b/i.test(combinedInfo)) {
+        organizer = 'IEEE Computer Society';
+      } else if (/\bUSENIX\b/i.test(combinedInfo)) {
+        organizer = 'USENIX Association';
+      }
+
+      const isWorkshop =
+        /\bworkshop\b/i.test(conf.title) ||
+        /\bworkshop\b/i.test(conf.description || '') ||
+        /\bworkshop\b/i.test(edition.id || '');
+      const itemType = isWorkshop ? 'workshop' : 'conference';
+
       results.push({
         title,
-        type: 'conference',
+        type: itemType,
         conference_tier: confTier || 'Industry / Non-Academic',
         subfield: mapCCFSubToCategory(conf.sub),
-        organizer: conf.sub ? `CCF-${conf.sub} / ${conf.title} Steering Committee` : `${conf.title} Committee`,
+        organizer,
         start_date: startDate || `${edition.year}-01-01`,
         end_date: endDate || `${edition.year}-12-31`,
         submission_deadline: latestUpcomingDeadline,

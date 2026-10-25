@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { TechOpportunity, EventComment } from '@/types';
-import { TypeBadge, TierBadge, FormatBadge, ConfidenceBadge, CATEGORY_COLORS } from './Badge';
+import { TypeBadge, TierBadge, FormatBadge, ConfidenceBadge, SocietyBadge, CATEGORY_COLORS } from './Badge';
+import { detectSocieties } from '@/lib/societyUtils';
 import { getInteraction, toggleStar, toggleParticipating, addComment } from '@/lib/interactions';
 import {
   ExternalLink,
@@ -124,6 +125,9 @@ export default function OpportunityCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <TypeBadge type={opportunity.type} />
             {opportunity.type === 'conference' && <TierBadge tier={opportunity.conference_tier} />}
+            {detectSocieties(opportunity).map(soc => (
+              <SocietyBadge key={soc} society={soc} />
+            ))}
             {opportunity.subfield && (
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">
                 {opportunity.subfield}

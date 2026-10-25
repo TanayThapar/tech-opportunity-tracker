@@ -114,3 +114,38 @@ export function ConfidenceBadge({ confidence }: { confidence: DiscoveryConfidenc
     </span>
   );
 }
+
+export function SocietyBadge({ society }: { society: 'ACM' | 'IEEE' | 'USENIX' }) {
+  if (society === 'ACM') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-sky-950/80 text-sky-300 border border-sky-400/50 shadow-sm"
+        title="ACM Sponsored / Special Interest Group Event"
+      >
+        ACM
+      </span>
+    );
+  }
+  if (society === 'IEEE') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-blue-950/90 text-blue-300 border border-blue-400/50 shadow-sm"
+        title="IEEE Sponsored Technical Event"
+      >
+        IEEE
+      </span>
+    );
+  }
+  if (society === 'USENIX') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-indigo-950/80 text-indigo-300 border border-indigo-400/50 shadow-sm"
+        title="USENIX Association Event"
+      >
+        USENIX
+      </span>
+    );
+  }
+  return null;
+}
+

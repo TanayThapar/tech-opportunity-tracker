@@ -26,6 +26,7 @@ import {
   Filter,
 } from 'lucide-react';
 import Link from 'next/link';
+import { SocietyFilter, matchesSociety, getSocietyStats } from '@/lib/societyUtils';
 import { getAllInteractions } from '@/lib/interactions';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
@@ -38,6 +39,7 @@ export default function HomePage() {
   const [selectedFormat, setSelectedFormat] = useState<OpportunityFormat | 'all'>('all');
   const [selectedCompany, setSelectedCompany] = useState<string | 'all'>('all');
   const [selectedSubfield, setSelectedSubfield] = useState<string | 'all'>('all');
+  const [selectedSociety, setSelectedSociety] = useState<SocietyFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyStarred, setOnlyStarred] = useState(false);
   const [onlyAttending, setOnlyAttending] = useState(false);
@@ -202,6 +204,7 @@ export default function HomePage() {
       if (selectedType !== 'all' && item.type !== selectedType) return false;
       if (selectedTier !== 'all' && item.conference_tier !== selectedTier) return false;
       if (selectedSubfield !== 'all' && item.subfield !== selectedSubfield) return false;
+      if (!matchesSociety(item, selectedSociety)) return false;
       if (selectedFormat !== 'all' && item.format !== selectedFormat) return false;
       if (selectedCompany !== 'all') {
         const itemCompany = item.company || (item.type === 'job' ? item.organizer : null);
@@ -230,6 +233,7 @@ export default function HomePage() {
     selectedType,
     selectedTier,
     selectedSubfield,
+    selectedSociety,
     selectedFormat,
     selectedCompany,
     searchQuery,
@@ -245,6 +249,8 @@ export default function HomePage() {
     });
     return counts;
   }, [opportunities]);
+
+  const societyStats = useMemo(() => getSocietyStats(opportunities), [opportunities]);
 
   return (
     <div className="min-h-screen bg-[#0c1015] text-[#e6edf3] font-sans flex flex-col selection:bg-lime-400 selection:text-slate-950">
@@ -464,6 +470,9 @@ export default function HomePage() {
           onSelectCompany={setSelectedCompany}
           selectedSubfield={selectedSubfield}
           onSelectSubfield={setSelectedSubfield}
+          selectedSociety={selectedSociety}
+          onSelectSociety={setSelectedSociety}
+          societyCounts={societyStats}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           tierList={tierList}
@@ -490,6 +499,7 @@ export default function HomePage() {
                   setSelectedType('all');
                   setSelectedTier('all');
                   setSelectedSubfield('all');
+                  setSelectedSociety('all');
                   setSelectedFormat('all');
                   setSelectedCompany('all');
                   setSearchQuery('');
